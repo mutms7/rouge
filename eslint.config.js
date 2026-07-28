@@ -107,6 +107,16 @@ export default tseslint.config(
     },
   },
 
+  // The one file allowed to name the things engine/ is banned from touching, because
+  // its whole job is taking them away and proving a combat still resolves.
+  {
+    files: ['src/engine/purity.test.ts'],
+    rules: {
+      'no-restricted-globals': 'off',
+      'no-restricted-properties': 'off',
+    },
+  },
+
   // The sim is headless too, but it is allowed a clock and a CLI.
   {
     files: ['src/sim/**/*.ts'],
