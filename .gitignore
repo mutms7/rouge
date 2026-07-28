@@ -1,0 +1,18 @@
+node_modules/
+dist/
+dist-ssr/
+.vercel/
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+
+# tauri
+src-tauri/target/
+src-tauri/gen/
+
+# generated
+public/art/manifest.json
+coverage/
+sim-out/
