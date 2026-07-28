@@ -10,17 +10,7 @@ Start both on day one.
 
 ## Day one, in order
 
-**1. Push the repo.** It's already `git init`ed at `C:\Users\William Chenyin\Documents\GitHub\rouge` with these docs in it. Commit them, then:
-
-```bash
-gh auth switch --user mutms7
-```
-
-```bash
-gh repo create mutms7/arrears --public --source=. --remote=origin --push
-```
-
-Heads up, Claude Code's auto-mode classifier blocks `gh repo create`, so run that one yourself in a terminal. Ordinary pushes afterwards work fine.
+**1. The repo.** Done. It lives at `C:\Users\William Chenyin\Documents\GitHub\rouge` and pushes to [mutms7/rouge](https://github.com/mutms7/rouge). Note the `gh` account: this one belongs to `mutms7`, not the work account, so if a push ever asks for a password, run `gh auth switch --user mutms7` first and switch back after.
 
 **2. Kick off Codex.** Hand it `docs/prompts/CODEX_ART_PROMPT.md` and tell it to do step 1 of the consistency protocol only: three anchor images, nothing else. You review those three before it makes 126 more. This is the single highest-leverage review in the project, so don't rubber-stamp it.
 

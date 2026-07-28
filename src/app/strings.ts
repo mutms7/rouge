@@ -6,7 +6,7 @@
  */
 export const strings = {
   brand: {
-    title: 'ARREARS',
+    title: 'ROUGE',
     tagline: 'You are in the red.',
   },
   pipeline: {

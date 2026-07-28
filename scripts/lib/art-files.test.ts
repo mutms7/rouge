@@ -8,7 +8,7 @@ let root: string;
 let scan: ArtScan;
 
 beforeAll(async () => {
-  root = await mkdtemp(path.join(tmpdir(), 'arrears-art-'));
+  root = await mkdtemp(path.join(tmpdir(), 'rouge-art-'));
   await mkdir(path.join(root, 'cards'), { recursive: true });
   await mkdir(path.join(root, 'enemies'), { recursive: true });
   await mkdir(path.join(root, 'sprites'), { recursive: true });

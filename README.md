@@ -1,6 +1,6 @@
-# ARREARS
+# ROUGE
 
-*Codename: Rouge.*
+*You are in the red.*
 
 A roguelike deckbuilding dungeon crawler about carrying other people's debts down a hole and finding out what yours was.
 

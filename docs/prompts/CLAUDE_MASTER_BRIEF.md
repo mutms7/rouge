@@ -6,7 +6,7 @@ Paste this at the top of every session, or point Claude at the file path. It's t
 
 ## What you're building
 
-**ARREARS** (codename Rouge), a roguelike deckbuilding dungeon crawler. Web-first TypeScript, wrapped in Tauri for a Steam release.
+**ROUGE**, a roguelike deckbuilding dungeon crawler. Web-first TypeScript, wrapped in Tauri for a Steam release.
 
 Read `docs/DESIGN.md` for the game and `docs/ART_CONTRACT.md` for how art lands. Don't restate them back to me, just build against them.
 

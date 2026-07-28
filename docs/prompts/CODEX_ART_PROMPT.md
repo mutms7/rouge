@@ -201,7 +201,7 @@ Keep these dumb and obvious. `weight` is a simple weight. `lap` is a circular ar
 
 ### Store (9) and brand (1)
 
-Sizes in §6 of the art contract. These are the only files allowed to contain text, and only the wordmark. `brand/wordmark` is the word ARREARS in a condensed slab serif, slightly letterpressed, slate on transparent, with the second R very slightly lower than the rest as if it settled.
+Sizes in §6 of the art contract. These are the only files allowed to contain text, and only the wordmark. `brand/wordmark` is the word ROUGE in a condensed slab serif, slightly letterpressed, slate on transparent, with the E sitting a hair below the baseline as if it had settled there.
 
 ---
 
