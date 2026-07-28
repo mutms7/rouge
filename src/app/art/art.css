@@ -1,0 +1,42 @@
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.art__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.art--placeholder {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.art__glyph {
+  width: 34%;
+  max-width: 96px;
+  height: auto;
+  opacity: 0.5;
+}
+
+.art__label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.35em 0.5em;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: 0.02em;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
