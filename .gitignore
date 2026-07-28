@@ -14,5 +14,9 @@ src-tauri/gen/
 
 # generated
 public/art/manifest.json
+public/art/**/*.webp
 coverage/
 sim-out/
+
+# scratch
+tmp/

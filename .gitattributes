@@ -1,0 +1,6 @@
+# Windows locally, Linux in CI. Normalise on the way in, LF in the repo.
+* text=auto eol=lf
+
+*.png binary
+*.webp binary
+*.ico binary

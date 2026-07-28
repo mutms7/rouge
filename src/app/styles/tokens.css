@@ -1,0 +1,38 @@
+/**
+ * The palette, and nothing but.
+ *
+ * These seven values must stay byte-identical to `src/content/palette.ts`, which the
+ * art pipeline also reads. `src/app/styles/tokens.test.ts` fails if they drift.
+ *
+ * Oxblood means debt, damage, or interest. If something is red for any other reason,
+ * the visual language is broken.
+ */
+:root {
+  --paper: #E8DFCE;
+  --chalk: #B9B3A6;
+  --slate: #3B3A38;
+  --void: #14110F;
+  --oxblood: #8C2B2B;
+  --brine: #2F6E6A;
+  --brass: #B98B3C;
+
+  /* Semantic aliases. Components use these, not the colour names. */
+  --bg: var(--paper);
+  --ink: var(--slate);
+  --ink-strong: var(--void);
+  --ink-quiet: var(--chalk);
+  --rule: var(--chalk);
+  --debt: var(--oxblood);
+  --salt: var(--brass);
+
+  /* Type. One slab-ish stack for display, one mono for IDs and numbers. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
+
+  /* Honoured by every text node. Phase 7 puts a slider on it. */
+  --font-scale: 1;
+
+  /* Beat grid and card geometry get their tokens in phase 3. */
+  --space: 8px;
+}
