@@ -4,7 +4,9 @@
 
 A roguelike deckbuilding dungeon crawler about carrying other people's debts down a hole and finding out what yours was.
 
-Nothing is built yet. This repo currently holds the design and the two build briefs.
+**Web build: [rougerogue.vercel.app](https://rougerogue.vercel.app)**
+
+There's no game in it yet. Phase 0 is done, which means the project skeleton, the art pipeline, and CI. What the link shows you is procedural placeholders proving that art lands by content ID with no code change. Combat arrives in phase 3.
 
 ---
 
@@ -48,3 +50,20 @@ Everything past that (Acts 2 and 3, the other three characters, the Inversion, t
 TypeScript and Vite, React for the view, a pure deterministic engine core with no DOM so it can be simulated headlessly, Tauri v2 for the desktop build, Steamworks through the Rust crate. Vercel for the web demo.
 
 The engine being pure and seeded isn't fussiness. It's what makes the balance sim possible, and a deckbuilder you can't simulate is a deckbuilder you can't balance.
+
+---
+
+## Working on it
+
+```bash
+npm install && npm run dev
+```
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Vite dev server, regenerates the art manifest first. |
+| `npm run typecheck` / `lint` / `test` | What CI runs, in that order. |
+| `npm run art:check` | Missing, orphan, wrong-size, wrong-transparency, off-palette, over-budget. The shared to-do list with the art track. |
+| `npm run art:sync` | Rebuild the webp files and the manifest after dropping art in. |
+
+Art goes in `public/art/<kind>/<content_id>.png` and shows up on its own. Nothing gets wired up by hand, and a missing file is a labelled placeholder rather than a broken image. See [ART_CONTRACT.md](docs/ART_CONTRACT.md).
