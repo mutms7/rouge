@@ -1,0 +1,453 @@
+/*
+ * The run: status bar, the ledger, and the rooms.
+ *
+ * Same rules as combat.css. Everything sizes off `--space` and `--font-scale` so the phase 7
+ * font slider is a one-line change. Nothing encodes meaning in colour alone: a node carries
+ * its §5.1 symbol and its name, a sold shelf row says "Sold", and an armed confirm says so in
+ * words rather than turning red and hoping.
+ *
+ * Clamped against the viewport rather than broken into breakpoints, so the same layout holds
+ * from 1280x720 to ultrawide.
+ */
+
+.run {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+/* Combat sizes itself to the viewport on its own; inside a run it gets what is left. */
+.run .combat {
+  height: 100%;
+  min-height: 0;
+}
+
+/* --- the status bar ------------------------------------------------------- */
+
+.runbar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 2.5);
+  padding: var(--space) calc(var(--space) * 3);
+  border-bottom: 1px solid var(--rule);
+  background: color-mix(in srgb, var(--chalk) 18%, transparent);
+}
+
+.runbar__stat {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--space) * 0.75);
+}
+
+.runbar__label {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.runbar__value {
+  font-family: var(--font-mono);
+  font-size: calc(15px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+/* Low HP is oxblood *and* underlined, because oxblood alone is not a signal. */
+.runbar__value[data-low] {
+  color: var(--debt);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.runbar__stat--quiet .runbar__value {
+  color: var(--ink);
+  font-size: calc(12px * var(--font-scale));
+}
+
+.runbar__spacer {
+  margin-left: auto;
+}
+
+/* --- the ledger ---------------------------------------------------------- */
+
+.ledger {
+  overflow-y: auto;
+  padding: calc(var(--space) * 3) calc(var(--space) * 3) calc(var(--space) * 6);
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.ledger__heading {
+  font-size: calc(22px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.ledger__depth {
+  margin: calc(var(--space) * 0.5) 0 calc(var(--space) * 3);
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.ledger__layers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: calc(var(--space) * 0.5);
+}
+
+.ledger__layer {
+  display: grid;
+  grid-template-columns: 2.5em 1fr;
+  align-items: center;
+  gap: var(--space);
+  padding: calc(var(--space) * 0.5) 0;
+  border-top: 1px solid color-mix(in srgb, var(--chalk) 45%, transparent);
+}
+
+.ledger__index {
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink-quiet);
+}
+
+.ledger__layer[data-readable] .ledger__index {
+  color: var(--ink);
+}
+
+.ledger__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+}
+
+.ledger__node {
+  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 0.75);
+  padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ink-quiet);
+  text-align: left;
+}
+
+.ledger__symbol {
+  font-family: var(--font-mono);
+  font-size: calc(16px * var(--font-scale));
+  line-height: 1;
+}
+
+.ledger__name {
+  font-family: var(--font-display);
+  font-size: calc(14px * var(--font-scale));
+}
+
+.ledger__node[data-state='walked'] {
+  color: var(--ink);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--chalk) 80%, transparent);
+}
+
+.ledger__node[data-state='here'] {
+  color: var(--ink-strong);
+  border-color: var(--ink-strong);
+  background: color-mix(in srgb, var(--chalk) 40%, transparent);
+}
+
+.ledger__node--open {
+  cursor: pointer;
+  color: var(--ink-strong);
+  border-color: var(--rule);
+}
+
+.ledger__node--open:hover,
+.ledger__node--open:focus-visible {
+  background: color-mix(in srgb, var(--chalk) 30%, transparent);
+}
+
+/* The cursor is a border and an offset marker, not a colour. */
+.ledger__node--open[data-selected] {
+  border-color: var(--ink-strong);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--brass) 18%, transparent);
+}
+
+.ledger__unread {
+  display: block;
+  width: calc(var(--space) * 6);
+  border-bottom: 1px dashed color-mix(in srgb, var(--chalk) 70%, transparent);
+  height: 1em;
+}
+
+/* --- the rooms ---------------------------------------------------------- */
+
+.prompt {
+  overflow-y: auto;
+  padding: calc(var(--space) * 4) calc(var(--space) * 3) calc(var(--space) * 6);
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.prompt__heading {
+  font-size: calc(26px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.prompt__blurb {
+  margin: calc(var(--space) * 1.5) 0 0;
+  max-width: 58ch;
+  font-family: var(--font-display);
+  font-style: italic;
+}
+
+.prompt__blurb--quiet {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink);
+}
+
+.prompt__list {
+  list-style: none;
+  margin: calc(var(--space) * 3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space);
+}
+
+.prompt__list[data-wide] {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: calc(var(--space) * 2);
+}
+
+.pick {
+  font: inherit;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: calc(var(--space) * 1.5);
+  padding: calc(var(--space) * 1.5);
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.prompt__list[data-wide] .pick {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.pick:hover,
+.pick:focus-visible {
+  border-color: var(--ink-strong);
+}
+
+.pick[data-selected] {
+  border-color: var(--ink-strong);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--brass) 14%, transparent);
+}
+
+.pick[data-armed] {
+  border-color: var(--debt);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--oxblood) 10%, transparent);
+}
+
+.pick[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.pick__art {
+  display: block;
+  width: clamp(120px, 14vw, 180px);
+}
+
+.prompt__list[data-wide] .pick__art {
+  width: 100%;
+}
+
+.pick__art--token {
+  width: clamp(48px, 5vw, 72px);
+}
+
+.pick__art .art {
+  width: 100%;
+  height: auto;
+}
+
+.pick__body {
+  display: grid;
+  gap: calc(var(--space) * 0.5);
+}
+
+.pick__name {
+  font-family: var(--font-display);
+  font-size: calc(16px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.pick__detail {
+  font-size: calc(13px * var(--font-scale));
+}
+
+.pick__cost {
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--salt);
+  justify-self: end;
+  align-self: start;
+}
+
+.pick__warn,
+.pick__confirm {
+  grid-column: 1 / -1;
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pick__warn {
+  color: var(--ink);
+}
+
+.pick__confirm {
+  color: var(--debt);
+}
+
+/* --- the sheet ---------------------------------------------------------- */
+
+.sheet__panel--wide {
+  min-width: min(920px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.roster__heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space);
+  font-size: calc(15px * var(--font-scale));
+  color: var(--ink-strong);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: calc(var(--space) * 0.5);
+}
+
+.roster__count {
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.roster__list {
+  list-style: none;
+  margin: var(--space) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space);
+}
+
+.roster__item {
+  display: grid;
+  gap: calc(var(--space) * 0.25);
+  padding: var(--space);
+  border: 1px solid color-mix(in srgb, var(--chalk) 60%, transparent);
+}
+
+.roster__item--empty {
+  border-style: dashed;
+  color: var(--ink-quiet);
+}
+
+.roster__art {
+  display: block;
+  width: calc(var(--space) * 5);
+}
+
+.roster__art .art {
+  width: 100%;
+  height: auto;
+}
+
+.roster__name {
+  font-family: var(--font-display);
+  font-size: calc(14px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.roster__text {
+  font-size: calc(12px * var(--font-scale));
+}
+
+.roster__empty {
+  margin: var(--space) 0 0;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink);
+}
+
+.roster__deck {
+  list-style: none;
+  margin: var(--space) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space);
+}
+
+.roster__card {
+  display: grid;
+  gap: calc(var(--space) * 0.25);
+  padding: calc(var(--space) * 0.75);
+  border: 1px solid color-mix(in srgb, var(--chalk) 60%, transparent);
+}
+
+.roster__cardArt {
+  display: block;
+}
+
+.roster__cardArt .art {
+  width: 100%;
+  height: auto;
+}
+
+.roster__cardName {
+  font-family: var(--font-display);
+  font-size: calc(13px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.roster__cardMeta {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.select__resume {
+  margin-top: calc(var(--space) * 2);
+  padding: calc(var(--space) * 2);
+  border: 1px solid var(--ink-strong);
+}

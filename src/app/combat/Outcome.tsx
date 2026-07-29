@@ -1,9 +1,13 @@
 /**
- * Won or lost.
+ * Won or lost, on the board, for one beat before the run carries on.
  *
- * Deliberately thin. Phase 5 owns the real run summary (the deck you ended with, the Marks
- * you bought, the cards you deleted to buy them), and there is no run to summarise yet, so
- * this says the two things a combat knows about itself and gets out of the way.
+ * It exists because the run reducer settles a finished fight instantly: the moment the last
+ * body falls, `run.combat` is null and the reward screen is up. Which is correct, and which
+ * would also mean the player never sees the board they just won on. So the store holds the
+ * finished combat until this is dismissed, and the only thing it can do is dismiss.
+ *
+ * Deliberately thin. Phase 5 owns the real run summary: the deck you ended with, the Marks
+ * you bought, and the cards you Settled to buy them.
  */
 import { motion } from 'motion/react';
 import { useDuration } from '../settings';
@@ -12,11 +16,11 @@ import type { CombatState } from '../../engine/types';
 
 export type OutcomeProps = {
   readonly state: CombatState;
-  readonly onAgain: () => void;
-  readonly onLeave: () => void;
+  readonly onward: () => void;
+  readonly label: string;
 };
 
-export function Outcome({ state, onAgain, onLeave }: OutcomeProps) {
+export function Outcome({ state, onward, label }: OutcomeProps) {
   const duration = useDuration(0.3);
   const won = state.outcome === 'won';
 
@@ -37,11 +41,8 @@ export function Outcome({ state, onAgain, onLeave }: OutcomeProps) {
           {strings.outcome.beats(state.beat)} · {strings.outcome.cards(state.cardsPlayed)}
         </p>
         <div className="sheet__actions">
-          <button type="button" className="button" onClick={onAgain} autoFocus>
-            {strings.outcome.again}
-          </button>
-          <button type="button" className="button button--quiet" onClick={onLeave}>
-            {strings.outcome.back}
+          <button type="button" className="button" onClick={onward} autoFocus>
+            {label}
           </button>
         </div>
       </div>

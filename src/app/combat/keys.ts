@@ -22,7 +22,13 @@
  *   f              hold for fast-forward. Held rather than toggled, so it cannot be left
  *                  on by accident, and there is a toggle in the UI for people who want it
  *                  permanently.
+ *   s              the character sheet: Marks, collateral, the whole deck. Reachable
+ *                  mid-fight, because what is on the sheet is why the numbers are what they
+ *                  are and the answer should never be behind a menu.
  *   ?              the key legend.
+ *   enter / r      once the fight is decided, leave the board and get on with the run. It is
+ *                  deliberately not a hotkey mid-fight: nothing should move on under your
+ *                  hands while you are still holding cards.
  */
 
 export type CombatIntent =
@@ -33,7 +39,8 @@ export type CombatIntent =
   | { readonly k: 'cancel' }
   | { readonly k: 'wait' }
   | { readonly k: 'toggle_help' }
-  | { readonly k: 'restart' };
+  | { readonly k: 'toggle_sheet' }
+  | { readonly k: 'onward' };
 
 export type KeyContext = {
   /** How many cards are in hand. Zero means the cursor keys have nothing to do. */
@@ -59,9 +66,12 @@ export function intentForKey(key: string, context: KeyContext): CombatIntent | n
   const lower = key.toLowerCase();
 
   if (lower === '?' || lower === '/') return { k: 'toggle_help' };
+  if (lower === 's') return { k: 'toggle_sheet' };
   if (lower === 'escape') return { k: 'cancel' };
-  if (lower === 'r' && !context.interactive) return { k: 'restart' };
-  if (!context.interactive) return null;
+  if (!context.interactive) {
+    if (lower === 'r' || lower === 'enter' || lower === ' ') return { k: 'onward' };
+    return null;
+  }
 
   if (context.targeting) {
     if (lower === 'arrowleft') return { k: 'target_move', by: -1 };

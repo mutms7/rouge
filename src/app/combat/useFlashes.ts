@@ -14,8 +14,8 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { shouldSkipAnimation, useSettings } from '../settings';
+import { useApp, useCombatState } from '../store';
 import { flashesSince, type Flash } from './feed';
-import { useCombat } from './store';
 
 /** How long a number hangs. Long enough to read, short enough to keep up with fast play. */
 const LINGER_MS = 850;
@@ -23,8 +23,8 @@ const LINGER_MS = 850;
 const NONE: Flash[] = [];
 
 export function useFlashes(): Flash[] {
-  const state = useCombat((s) => s.state);
-  const logCursor = useCombat((s) => s.logCursor);
+  const state = useCombatState();
+  const logCursor = useApp((s) => s.logCursor);
   // Object identity, so a restart of the same fight is a different batch.
   const [expired, setExpired] = useState<object | null>(null);
 

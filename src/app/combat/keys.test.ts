@@ -40,12 +40,11 @@ describe('keyboard play', () => {
     expect(intentForKey('?', over)).toEqual({ k: 'toggle_help' });
   });
 
-  it('goes quiet once the fight is decided, apart from restarting it', () => {
+  it('goes quiet once the fight is decided, apart from moving on', () => {
     expect(intentForKey('1', over)).toBeNull();
-    expect(intentForKey('Enter', over)).toBeNull();
     expect(intentForKey('w', over)).toBeNull();
-    expect(intentForKey('r', over)).toEqual({ k: 'restart' });
-    // R is not a hotkey mid-fight: nothing should restart under your hands.
+    for (const key of ['Enter', ' ', 'r']) expect(intentForKey(key, over)).toEqual({ k: 'onward' });
+    // R is not a hotkey mid-fight: the run should not move on under your hands.
     expect(intentForKey('r', playing)).toBeNull();
   });
 

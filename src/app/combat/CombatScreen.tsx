@@ -18,6 +18,7 @@ import { effectiveWeight, isPlayerTurn } from '../../engine/combat';
 import { cardWeight } from '../../engine/tally';
 import type { Action, CombatState } from '../../engine/types';
 import { useSettings } from '../settings';
+import { useApp } from '../store';
 import { strings } from '../strings';
 import { EnemyBoard, PlayerPanel } from './Bodies';
 import { faceOf } from './face';
@@ -27,7 +28,7 @@ import { Help } from './Help';
 import { intentForKey, isFastForwardKey, moveCursor } from './keys';
 import { Outcome } from './Outcome';
 import { previewAction } from './preview';
-import { actorOf, needsTarget, playAction, targetableEnemies, useCombat } from './store';
+import { actorOf, needsTarget, playAction, targetableEnemies } from './store';
 import { Tally } from './Tally';
 import { trackView } from './track';
 import { useFlashes } from './useFlashes';
@@ -42,30 +43,32 @@ function actionFor(state: CombatState, uid: string, targetIndex: number): Action
   return playAction(state, uid, foe?.id);
 }
 
-export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
-  const state = useCombat((s) => s.state);
-  const encounterId = useCombat((s) => s.encounterId);
-  const seed = useCombat((s) => s.seed);
-  const cursor = useCombat((s) => s.cursor);
-  const hovered = useCombat((s) => s.hovered);
-  const targeting = useCombat((s) => s.targeting);
-  const helpOpen = useCombat((s) => s.helpOpen);
-  const hoveredTarget = useCombat((s) => s.hoveredTarget);
-  const store = useCombat.getState;
+export type CombatScreenProps = {
+  /** The live fight, or the board a finished one ended on. */
+  readonly state: CombatState;
+  readonly encounterId: string;
+  /** Present once the fight is decided: the only thing left to do is leave. */
+  readonly onward: (() => void) | null;
+};
+
+export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) {
+  const cursor = useApp((s) => s.cursor);
+  const hovered = useApp((s) => s.hovered);
+  const targeting = useApp((s) => s.targeting);
+  const helpOpen = useApp((s) => s.helpOpen);
+  const hoveredTarget = useApp((s) => s.hoveredTarget);
+  const store = useApp.getState;
 
   const flashes = useFlashes();
-  const fastForwardLocked = useSettings((s) => s.fastForwardLocked);
-  const toggleFastForwardLock = useSettings((s) => s.toggleFastForwardLock);
 
-  const interactive = state !== null && isPlayerTurn(state);
-  const hand = state?.deck.hand ?? [];
+  const interactive = onward === null && isPlayerTurn(state);
+  const hand = state.deck.hand;
 
   // Which card the preview is about: the mouse beats the keyboard, because it moved more
   // recently, and a card being targeted beats both.
   const previewUid = targeting?.uid ?? hovered ?? (interactive ? hand[cursor]?.uid : undefined) ?? null;
 
   const targetIndex = useMemo(() => {
-    if (!state) return 0;
     if (targeting) return targeting.index;
     if (!hoveredTarget) return 0;
     const found = targetableEnemies(state).findIndex((c) => c.id === hoveredTarget);
@@ -73,13 +76,13 @@ export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
   }, [state, targeting, hoveredTarget]);
 
   const preview = useMemo(() => {
-    if (!state || !interactive || !previewUid) return null;
+    if (!interactive || !previewUid) return null;
     return previewAction(state, actionFor(state, previewUid, targetIndex));
   }, [state, interactive, previewUid, targetIndex]);
 
   const commit = useCallback(
     (uid: string) => {
-      const current = store().state;
+      const current = store().run?.combat ?? null;
       if (!current || !isPlayerTurn(current)) return;
       if (needsTarget(current, uid) && store().targeting?.uid !== uid) {
         store().beginTargeting(uid);
@@ -101,7 +104,7 @@ export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
       }
 
       const current = store();
-      const live = current.state;
+      const live = current.run?.combat ?? null;
       const size = live?.deck.hand.length ?? 0;
       const intent = intentForKey(event.key, {
         handSize: size,
@@ -137,8 +140,11 @@ export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
         case 'toggle_help':
           current.toggleHelp();
           break;
-        case 'restart':
-          if (current.encounterId) current.start(current.encounterId, current.seed);
+        case 'toggle_sheet':
+          current.toggleSheet();
+          break;
+        case 'onward':
+          current.onward();
           break;
       }
     };
@@ -160,8 +166,6 @@ export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
       window.removeEventListener('blur', onBlur);
     };
   }, [store, commit]);
-
-  if (!state || !encounterId) return null;
 
   const naming = namingFor(state);
   const view = trackView(state, actorOf(state)?.id ?? null);
@@ -203,28 +207,12 @@ export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
 
   return (
     <div className="combat">
+      {/* The seed, fast-forward and the legend live on the run's status bar, one level up. */}
       <header className="combat__bar">
-        <button type="button" className="link" onClick={onLeave}>
-          {strings.outcome.back}
-        </button>
         <span className="combat__title">{encounter.name}</span>
         <span className="combat__clock">
           {strings.combat.lap(view.lap)} · {strings.combat.beat} {state.beat}
         </span>
-        <span className="combat__seed">
-          {strings.select.seed} {seed}
-        </span>
-        <button
-          type="button"
-          className="link"
-          data-on={fastForwardLocked || undefined}
-          onClick={toggleFastForwardLock}
-        >
-          {strings.keys.fastForward} ({strings.keys.fastForwardHint})
-        </button>
-        <button type="button" className="link" onClick={() => { store().toggleHelp(); }}>
-          {strings.keys.help}
-        </button>
       </header>
 
       <EnemyBoard
@@ -266,11 +254,11 @@ export function CombatScreen({ onLeave }: { readonly onLeave: () => void }) {
         onActivate={commit}
       />
 
-      {state.outcome === 'ongoing' ? null : (
+      {onward === null ? null : (
         <Outcome
           state={state}
-          onAgain={() => { store().start(encounterId, seed); }}
-          onLeave={onLeave}
+          onward={onward}
+          label={state.outcome === 'won' ? strings.outcome.onward : strings.outcome.onwardLost}
         />
       )}
       {helpOpen ? <Help onClose={() => { store().toggleHelp(); }} /> : null}

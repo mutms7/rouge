@@ -1,36 +1,45 @@
-import { useState } from 'react';
 import './app.css';
-import { CombatScreen } from './combat/CombatScreen';
-import { FightSelect } from './combat/FightSelect';
-import { useCombat } from './combat/store';
 import './combat/combat.css';
+import './run/run.css';
 import { useReducedMotionSync } from './settings';
+import { useApp } from './store';
+import { RunScreen } from './run/RunScreen';
+import { Title } from './Title';
 
 /**
- * Two screens: pick a fight, have the fight.
+ * Two screens: the way in, and the run.
  *
- * Phase 4 puts a map between them and this becomes a router. Until then the whole app is
- * one boolean, and the seed lives up here so it survives leaving a combat: you almost
- * always want to replay the same seed with a different line.
+ * Combat is not a third one. A fight is a field on a run, so `RunScreen` shows it the same way
+ * it shows a shop, and the router has no state of its own to get wrong: which screen is up is
+ * a function of whether there is a run.
  */
 export function App() {
   useReducedMotionSync();
-  const [seed, setSeed] = useState(1);
-  const encounterId = useCombat((s) => s.encounterId);
-  const start = useCombat((s) => s.start);
-  const leave = useCombat((s) => s.leave);
+  const run = useApp((s) => s.run);
+  const seed = useApp((s) => s.seed);
+  const hasSave = useApp((s) => s.hasSave);
+  const store = useApp.getState;
 
-  if (encounterId === null) {
+  if (!run) {
     return (
-      <FightSelect
+      <Title
         seed={seed}
-        onSeed={setSeed}
-        onPick={(id) => {
-          start(id, seed);
+        hasSave={hasSave}
+        onSeed={(next) => {
+          store().setSeed(next);
+        }}
+        onBegin={() => {
+          store().startRun(seed);
+        }}
+        onResume={() => {
+          store().resumeRun();
+        }}
+        onAbandon={() => {
+          store().abandonRun();
         }}
       />
     );
   }
 
-  return <CombatScreen onLeave={leave} />;
+  return <RunScreen />;
 }
