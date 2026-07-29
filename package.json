@@ -17,11 +17,14 @@
     "art:manifest": "tsx scripts/art-manifest.ts",
     "art:check": "tsx scripts/art-check.ts",
     "art:optimize": "tsx scripts/art-optimize.ts",
-    "art:sync": "npm run art:optimize && npm run art:manifest"
+    "art:sync": "npm run art:optimize && npm run art:manifest",
+    "content:check": "tsx scripts/content-check.ts",
+    "sim": "tsx src/sim/cli.ts"
   },
   "dependencies": {
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

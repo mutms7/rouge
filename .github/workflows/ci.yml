@@ -32,9 +32,19 @@ jobs:
       - name: test
         run: npm test
 
+      # Duplicate IDs, dangling Marks, an encounter naming a body that is not there. Also
+      # runs as a test, so this is for the readable output rather than for the gate.
+      - name: content check
+        run: npm run content:check
+
       # Warn-only until the demo is art-complete. Phase 9 adds --strict.
       - name: art check
         run: npm run art:check
+
+      # Small on purpose. The point is that the harness still plays every fight to a
+      # conclusion; the balance passes are run by hand in phase 6.
+      - name: sim smoke
+        run: npm run sim -- --runs 110 --seed 0 --no-cards
 
       - name: build
         run: npm run build
