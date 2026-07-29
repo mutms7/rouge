@@ -12,13 +12,22 @@
  * Phase 1 built the Tally: the track, Weight, Guard, Strain, and the keywords from §3.6.
  * Phase 2 added the rest of the effect vocabulary and the passive pipeline that Marks,
  * Tokens and enemy traits all run through. `vocabulary.ts` is the catalogue, and it says
- * which atoms the Tally resolves today and which ones phases 4 and 5 collect.
+ * which atoms the Tally resolves today and which ones phase 5 collects.
+ *
+ * Phase 4 put the run on top: `run.ts` is a second reducer, `(RunState, RunAction) => state`,
+ * with a whole combat living inside it. Which is why a save is a seed plus one action log
+ * and resuming mid-fight is not a special case.
  */
 export * from './constants';
+export * from './map';
 export * from './mods';
 export * from './rng';
+export * from './run';
+export * from './runmods';
+export * from './runtypes';
 export * from './tally';
 export * from './types';
+export * from './variants';
 export * from './vocabulary';
 export {
   cardWeightInHand,

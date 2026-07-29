@@ -6,14 +6,16 @@
  * the only place that translation happens, which keeps the conversion out of both the sim
  * and the view and means there is exactly one answer to "what does this fight look like".
  */
+import type { RunContent } from '../engine/runtypes';
 import type { CardDef, CombatSetup, EnemySetup, Mod } from '../engine/types';
-import { CARDS, CARD_LIST, cardOf } from './cards';
+import { CARDS, CARD_LIST, COMPOUND_IDS, DRAFTABLE_IDS, cardOf } from './cards';
 import { ENCOUNTERS, enemyOf } from './enemies';
+import { HOLLOWS, HOLLOW_IDS } from './hollows';
 import { markOf } from './marks';
-import { WICK } from './run';
-import { tokenOf } from './tokens';
+import { CHALK_WARDS, ECONOMY, MARK_SLOTS, WICK } from './run';
+import { TOKEN_IDS, TOKEN_LIST, tokenOf } from './tokens';
 import { loadOf } from './types';
-import type { Card, EncounterDef } from './types';
+import type { EncounterDef } from './types';
 
 /**
  * Every card, as the engine sees them.
@@ -92,7 +94,71 @@ export function deckLoad(deck: readonly string[]): number {
   return deck.reduce((total, id) => total + loadOf(cardOf(id)), 0);
 }
 
-/** Cards a reward screen may offer at a rarity. */
-export function poolByRarity(rarity: Card['rarity']): Card[] {
-  return CARD_LIST.filter((c) => c.rarity === rarity);
+/** Encounters by tier, which is what the map generator deals from. */
+function encounterIdsByTier(tier: EncounterDef['tier']): string[] {
+  return ENCOUNTERS.filter((e) => e.tier === tier).map((e) => e.id);
 }
+
+/**
+ * Everything a run needs, in the shapes `engine/run.ts` asks for.
+ *
+ * Same seam as `CARD_LIBRARY`, one layer up: the engine may not import `content/`, so a run
+ * is handed its content as a value. Which is also what makes the whole layer testable
+ * against a three-card library and a two-layer map instead of against the real act.
+ *
+ * Derived, never written down twice. Adding a Hollow to `hollows.ts` puts it in the map
+ * rotation with no second edit.
+ */
+export function runContent(): RunContent {
+  const cardMarks: Record<string, string> = {};
+  const cardRarity: Record<string, string> = {};
+  for (const card of CARD_LIST) {
+    cardRarity[card.id] = card.rarity;
+    if (card.mark) cardMarks[card.id] = card.mark.id;
+  }
+
+  const markMods: Record<string, readonly Mod[]> = {};
+  for (const card of CARD_LIST) {
+    if (card.mark) markMods[card.mark.id] = card.mark.mods;
+  }
+
+  const tokenMods: Record<string, readonly Mod[]> = {};
+  for (const token of TOKEN_LIST) tokenMods[token.id] = token.mods;
+
+  const encounterSetups: Record<string, readonly EnemySetup[]> = {};
+  for (const encounter of ENCOUNTERS) encounterSetups[encounter.id] = enemySetups(encounter);
+
+  return {
+    library: CARD_LIBRARY,
+    cardMarks,
+    cardRarity,
+    markMods,
+    tokenMods,
+    tokenIds: TOKEN_IDS,
+    draftableIds: DRAFTABLE_IDS,
+    hollows: HOLLOWS,
+    hollowIds: HOLLOW_IDS,
+    compoundIds: COMPOUND_IDS,
+    encounters: {
+      normal: encounterIdsByTier('normal'),
+      collector: encounterIdsByTier('collector'),
+      boss: CHALK_WARDS.bossEncounterId,
+      // §11: the tutorial body. Fight one is always this one.
+      tutorial: 'chalk_debtor',
+    },
+    encounterSetups,
+    layers: CHALK_WARDS.layers,
+    economy: ECONOMY,
+    character: {
+      id: WICK.id,
+      name: WICK.name,
+      hp: WICK.hp,
+      markSlots: WICK.markSlots,
+      deck: WICK.deck,
+    },
+    maxMarkSlots: MARK_SLOTS.max,
+  };
+}
+
+/** Built once. Content is frozen data, so there is nothing to invalidate. */
+export const RUN_CONTENT: RunContent = runContent();

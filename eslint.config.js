@@ -117,6 +117,35 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * Engine tests may read the real content, and only the real content.
+   *
+   * The import ban exists so that shipped engine code cannot depend on which cards exist. A
+   * test file is not shipped and cannot create that dependency: no bundle ever sees it. And
+   * some of the things most worth asserting are only true of the real act, not of a fixture.
+   * "Every path through Act 1 has a Reckoning on it" and "all eight Hollows resolve without
+   * throwing" are exactly the bugs that would otherwise be found by a player.
+   *
+   * `sim/` comes with it for one reason: the heuristic policy is the only thing that can play a
+   * fight to its end, and a run test that cannot finish a fight cannot test a run. Everything
+   * else stays banned, and the purity rules above stay on, which is the half that matters.
+   */
+  {
+    files: ['src/engine/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['node:*', 'fs', 'path', 'os'], message: 'engine/ imports no host APIs.' },
+            { group: ['react', 'react-dom', 'react/*', 'zustand', 'motion', 'motion/*', 'howler'], message: 'engine/ is view-free.' },
+            { group: ['**/app/**', '**/platform/**'], message: 'Engine tests may read content and the sim policy. Not the view.' },
+          ],
+        },
+      ],
+    },
+  },
+
   // The sim is headless too, but it is allowed a clock and a CLI.
   {
     files: ['src/sim/**/*.ts'],

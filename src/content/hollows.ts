@@ -124,11 +124,10 @@ export const HOLLOW_LIST: readonly HollowDef[] = [
       {
         id: 'dip_one',
         label: 'Dip a card.',
-        requires: { cards: 1 },
-        outcomes: [
-          { k: 'upgrade_card', n: 1 },
-          { k: 'add_card_load', n: 1 },
-        ],
+        // §12 is one sentence about one card: "it is upgraded, and gains +1 Load". Two
+        // atoms would be two prompts and you could upgrade one card and weigh down
+        // another, which is a better deal than the well is offering.
+        outcomes: [{ k: 'upgrade_card', n: 1, load: 1 }],
       },
       { id: 'refuse', label: 'Keep your hands dry.', outcomes: [{ k: 'nothing' }], refusal: true },
     ],

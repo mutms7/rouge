@@ -95,8 +95,10 @@ describe('the vocabulary', () => {
     // `vocabulary.ts` naming the phase that collects it.
     const dormantMods = Object.entries(MOD_VOCAB).filter(([, v]) => !v.live);
     for (const [, entry] of dormantMods) expect(entry.owner).toBeTruthy();
+    // Phase 4 built the run, so every effect atom now has somewhere to land: the Tally
+    // resolves its own and `engine/run.ts` resolves `reveal_nodes`.
     const dormantEffects = Object.entries(EFFECT_VOCAB).filter(([, v]) => !v.live);
-    expect(dormantEffects.map(([k]) => k)).toEqual(['reveal_nodes']);
+    expect(dormantEffects.map(([k]) => k)).toEqual([]);
   });
 });
 
