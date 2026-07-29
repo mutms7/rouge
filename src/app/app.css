@@ -1,4 +1,153 @@
-.shell {
+/*
+ * Shared primitives and the fight-select screen.
+ *
+ * Everything sizes off `--space` and `--font-scale` so the phase 7 font-scale slider is a
+ * one-line change rather than an audit. Nothing here encodes meaning in colour alone:
+ * where oxblood appears it is always alongside a word or a shape that says the same thing.
+ */
+
+.button {
+  font: inherit;
+  font-family: var(--font-display);
+  font-size: calc(15px * var(--font-scale));
+  padding: calc(var(--space) * 1.25) calc(var(--space) * 3);
+  border: 1px solid var(--ink-strong);
+  background: var(--ink-strong);
+  color: var(--paper);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+.button:hover,
+.button:focus-visible {
+  background: var(--slate);
+}
+
+.button--quiet {
+  background: transparent;
+  color: var(--ink-strong);
+}
+
+.button--quiet:hover,
+.button--quiet:focus-visible {
+  background: var(--chalk);
+}
+
+.link {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  padding: calc(var(--space) * 0.5) var(--space);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+  text-transform: lowercase;
+}
+
+.link:hover,
+.link:focus-visible {
+  border-color: var(--rule);
+  color: var(--ink-strong);
+}
+
+.link[data-on] {
+  border-color: var(--ink-strong);
+  background: var(--ink-strong);
+  color: var(--paper);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px calc(var(--space) * 0.75);
+  border: 1px solid var(--debt);
+  color: var(--debt);
+}
+
+/* A modal sheet: the key legend and the outcome panel. */
+.sheet {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--void) 62%, transparent);
+  z-index: 50;
+}
+
+.sheet__panel {
+  background: var(--paper);
+  border: 2px solid var(--ink-strong);
+  padding: calc(var(--space) * 4);
+  min-width: min(440px, 90vw);
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 2);
+}
+
+.sheet__panel[data-outcome='lost'] {
+  border-color: var(--debt);
+}
+
+.sheet__title {
+  font-size: calc(30px * var(--font-scale));
+  color: var(--ink-strong);
+  letter-spacing: 0.06em;
+}
+
+.sheet__panel[data-outcome='lost'] .sheet__title {
+  color: var(--debt);
+}
+
+.sheet__blurb {
+  margin: 0;
+  max-width: 44ch;
+  font-family: var(--font-display);
+  font-style: italic;
+}
+
+.sheet__stats {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  color: var(--ink);
+}
+
+.sheet__actions {
+  display: flex;
+  gap: var(--space);
+}
+
+.sheet__keys {
+  margin: 0;
+  display: grid;
+  gap: calc(var(--space) * 0.75);
+}
+
+.sheet__key {
+  display: grid;
+  grid-template-columns: 8em 1fr;
+  gap: var(--space);
+  align-items: baseline;
+}
+
+.sheet__key dt {
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.sheet__key dd {
+  margin: 0;
+  font-size: calc(14px * var(--font-scale));
+}
+
+/* --- fight select --------------------------------------------------------- */
+
+.select {
   max-width: 1100px;
   margin: 0 auto;
   padding: calc(var(--space) * 6) calc(var(--space) * 3);
@@ -7,60 +156,102 @@
   gap: calc(var(--space) * 4);
 }
 
-.shell__head {
+.select__head {
   border-bottom: 1px solid var(--rule);
   padding-bottom: calc(var(--space) * 2);
 }
 
-.shell__title {
+.select__title {
   font-size: calc(44px * var(--font-scale));
   letter-spacing: 0.08em;
   color: var(--ink-strong);
 }
 
-.shell__tagline {
+.select__tagline {
   margin: calc(var(--space) * 0.5) 0 0;
   font-family: var(--font-display);
   font-style: italic;
-  color: var(--ink);
 }
 
-.shell__heading {
+.select__heading {
   font-size: calc(20px * var(--font-scale));
   color: var(--ink-strong);
 }
 
-.shell__blurb,
-.shell__status {
+.select__blurb {
   max-width: 62ch;
   margin: calc(var(--space) * 1.5) 0 0;
 }
 
-.shell__status {
+.select__seed {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+  margin-top: calc(var(--space) * 2);
   font-family: var(--font-mono);
-  font-size: calc(13px * var(--font-scale));
+  font-size: calc(12px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.select__seed input {
+  font: inherit;
+  width: 8em;
+  padding: calc(var(--space) * 0.5);
+  border: 1px solid var(--rule);
+  background: transparent;
   color: var(--ink-strong);
 }
 
-.samples {
+.select__list {
   list-style: none;
-  margin: 0;
+  margin: calc(var(--space) * 2) 0 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: calc(var(--space) * 3);
-  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: calc(var(--space) * 2);
 }
 
-.samples__item {
+.select__card {
+  font: inherit;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space);
+  gap: calc(var(--space) * 0.5);
+  padding: var(--space);
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
 }
 
-.samples__path {
+.select__card:hover,
+.select__card:focus-visible {
+  border-color: var(--ink-strong);
+  background: color-mix(in srgb, var(--chalk) 35%, transparent);
+}
+
+.select__cardArt {
+  display: block;
+  height: 96px;
+  overflow: hidden;
+}
+
+.select__cardArt .art {
+  height: 100%;
+  width: auto;
+  margin: 0 auto;
+}
+
+.select__cardName {
+  font-family: var(--font-display);
+  font-size: calc(16px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.select__cardMeta {
   font-family: var(--font-mono);
-  font-size: calc(12px * var(--font-scale));
-  color: var(--slate);
-  overflow-wrap: anywhere;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink);
 }

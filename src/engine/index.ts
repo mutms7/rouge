@@ -30,5 +30,14 @@ export {
   legalActions,
   reduce,
 } from './combat';
-export { applyEffect, applyEffects, baseContext, dealDamage, decayGuard, handPassives, passivesOf } from './effects';
+export {
+  applyEffect,
+  applyEffects,
+  baseContext,
+  dealDamage,
+  decayGuard,
+  guardAfterDecay,
+  handPassives,
+  passivesOf,
+} from './effects';
 export type { DamageOptions, EffectContext } from './effects';

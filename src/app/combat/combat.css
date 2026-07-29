@@ -1,0 +1,844 @@
+/*
+ * Combat.
+ *
+ * Everything that moves moves by transform, because the Tally redraws on every action and
+ * a layout-animating track at 24 cells wide is how you get a screen that stutters on a
+ * Steam Deck. The one rule that makes the track work: every movable element is exactly one
+ * cell wide, so `translateX(n * 100%)` puts it on beat n without measuring anything.
+ *
+ * Sizes are clamped against the viewport rather than fixed, so the same layout holds from
+ * 1280x720 up to ultrawide with no breakpoints. The play area is capped and centred so an
+ * ultrawide gets margins instead of a stretched track.
+ */
+
+.combat {
+  --lane-label: clamp(64px, 7vw, 108px);
+  --lane-h: clamp(30px, 4vh, 42px);
+  --card-h: clamp(162px, 21vh, 212px);
+  /* Ten of these is the hand cap, and ten still fit across 1280 with the gaps. */
+  --card-w: calc(var(--card-h) * 0.68);
+  --body-h: clamp(96px, 15vh, 172px);
+  --hair: color-mix(in srgb, var(--chalk) 70%, transparent);
+
+  height: 100dvh;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: calc(var(--space) * 1.5) calc(var(--space) * 2.5);
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: calc(var(--space) * 1.5);
+  overflow: hidden;
+}
+
+.combat__bar {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 2);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: var(--space);
+}
+
+.combat__title {
+  font-family: var(--font-display);
+  font-size: calc(18px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.combat__clock,
+.combat__seed {
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.combat__seed {
+  margin-left: auto;
+  color: var(--ink-quiet);
+}
+
+/* --- bodies --------------------------------------------------------------- */
+
+.bodies {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: calc(var(--space) * 3);
+  min-height: var(--body-h);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 var(--space) var(--space);
+  border: 1px solid transparent;
+  cursor: default;
+}
+
+.body[data-target] {
+  border-color: var(--ink-strong);
+  background: color-mix(in srgb, var(--chalk) 30%, transparent);
+}
+
+.body[data-doomed] {
+  border-style: dashed;
+  border-color: var(--debt);
+}
+
+.body[data-dead] {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+
+.body__art {
+  position: relative;
+  height: var(--body-h);
+  display: flex;
+  align-items: flex-end;
+}
+
+.body__art .art {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  border: none;
+  background: none;
+}
+
+.body__name {
+  font-family: var(--font-display);
+  font-size: calc(14px * var(--font-scale));
+  color: var(--ink-strong);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space);
+}
+
+.body__phase {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  color: var(--debt);
+  text-transform: uppercase;
+}
+
+.body__hp {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+}
+
+.body__hpText,
+.player__hpText {
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink-strong);
+  white-space: nowrap;
+}
+
+.body__hpAfter {
+  margin-left: 0.4em;
+  color: var(--debt);
+}
+
+.body__hpAfter::before {
+  content: '→ ';
+}
+
+.body__stats,
+.body__next {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space) * 0.75);
+  min-height: 1.4em;
+}
+
+/* --- bars and stats ------------------------------------------------------- */
+
+.bar {
+  display: block;
+  width: clamp(70px, 8vw, 120px);
+  height: 8px;
+  /* The track is the debt showing through as the fill retreats. */
+  background: var(--debt);
+  border: 1px solid var(--ink-strong);
+  overflow: hidden;
+}
+
+.bar__fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--ink-strong);
+  transform-origin: left center;
+}
+
+.stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stat[data-zero] {
+  color: var(--ink-quiet);
+}
+
+.stat__value {
+  display: inline-block;
+  font-size: calc(14px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.stat[data-zero] .stat__value {
+  color: var(--ink-quiet);
+}
+
+.stat__after {
+  color: var(--debt);
+}
+
+.stat__after::before {
+  content: '→ ';
+}
+
+/* --- floating numbers ----------------------------------------------------- */
+
+.flashes {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--space) * 1.5);
+  pointer-events: none;
+}
+
+.flash {
+  font-family: var(--font-display);
+  font-size: calc(26px * var(--font-scale));
+  font-weight: 700;
+  color: var(--ink-strong);
+  text-shadow: 0 0 6px var(--paper), 0 0 3px var(--paper);
+}
+
+.flash[data-kind='damage'],
+.flash[data-kind='bleed'] {
+  color: var(--debt);
+}
+
+.flash[data-kind='blocked'] {
+  color: var(--ink-quiet);
+  font-size: calc(18px * var(--font-scale));
+}
+
+/* --- the tally ------------------------------------------------------------ */
+
+.tally {
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  padding: var(--space) 0;
+}
+
+.tally__ruler {
+  margin-left: var(--lane-label);
+  display: grid;
+  grid-template-columns: repeat(var(--beats), 1fr);
+}
+
+.tally__tick {
+  font-family: var(--font-mono);
+  font-size: calc(9px * var(--font-scale));
+  text-align: center;
+  color: var(--ink-quiet);
+  border-left: 1px solid transparent;
+}
+
+.tally__tick[data-lap-start] {
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.tally__lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tally__lane {
+  display: grid;
+  grid-template-columns: var(--lane-label) 1fr;
+  align-items: center;
+}
+
+.tally__lane[data-dead] {
+  opacity: 0.35;
+}
+
+.tally__name {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  padding-right: var(--space);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tally__lane[data-team='player'] .tally__name {
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.tally__strip {
+  position: relative;
+  height: var(--lane-h);
+}
+
+.tally__grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--beats), 1fr);
+}
+
+.tally__cell {
+  border-left: 1px solid var(--hair);
+}
+
+.tally__cell[data-lap-start] {
+  border-left: 2px solid var(--ink-strong);
+}
+
+.tally__slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--beats));
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.tally__slot--marker {
+  z-index: 3;
+}
+
+/* One cell wide, scaled along X to cover the beats you are handing over. */
+.tally__band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / var(--beats));
+  height: 100%;
+  transform-origin: left center;
+  background: color-mix(in srgb, var(--chalk) 55%, transparent);
+  border-left: 2px solid var(--ink-strong);
+  z-index: 1;
+}
+
+/*
+ * Guard as a distance. Hatched for the part that is melting, solid for the part something
+ * is holding off the melt. Sits along the bottom edge of the lane so it never fights an
+ * intent chip for space, and it is a texture rather than a colour, because a shield is not
+ * a debt and has no business being oxblood.
+ */
+.tally__guard {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: calc(100% / var(--beats));
+  height: 5px;
+  transform-origin: left center;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--slate) 0 2px,
+    transparent 2px 5px
+  );
+  border-bottom: 2px solid var(--slate);
+  z-index: 2;
+}
+
+.tally__guard--held {
+  background: var(--slate);
+}
+
+/* --- markers -------------------------------------------------------------- */
+
+.marker {
+  position: relative;
+  min-width: 2.4em;
+  padding: 1px 0.3em;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  letter-spacing: 0.04em;
+  border: 2px solid var(--ink-strong);
+  background: var(--paper);
+  color: var(--ink-strong);
+  white-space: nowrap;
+}
+
+.marker[data-team='player'] {
+  background: var(--ink-strong);
+  color: var(--paper);
+}
+
+/* Whose turn it is, said with a shape rather than a colour. */
+.marker[data-current]::before {
+  content: '▾';
+  position: absolute;
+  top: -1.05em;
+  left: 0;
+  right: 0;
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.marker[data-clamped]::after {
+  content: '»';
+  margin-left: 0.2em;
+}
+
+.marker--ghost {
+  border-style: dashed;
+  border-color: var(--slate);
+  background: transparent;
+  color: var(--slate);
+  opacity: 0.75;
+}
+
+/* --- chips ---------------------------------------------------------------- */
+
+/*
+ * Two chips sit side by side rather than stacked: a stack is taller than a lane at 720p
+ * and bleeds into its neighbour, and horizontally there is room, because nothing in Act 1
+ * acts more often than every two beats.
+ */
+.intent {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 3px;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.intent[data-flagged] {
+  border: 2px solid var(--debt);
+  background: color-mix(in srgb, var(--oxblood) 12%, var(--paper));
+}
+
+.chip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.2em;
+  font-family: var(--font-mono);
+  line-height: 1.05;
+  color: var(--ink-strong);
+}
+
+.chip[data-hostile] {
+  color: var(--debt);
+}
+
+.chip[data-promised] {
+  border-bottom: 1px dashed currentColor;
+}
+
+.chip__n {
+  font-size: calc(12px * var(--font-scale));
+  font-weight: 700;
+}
+
+.chip__code {
+  font-size: calc(8px * var(--font-scale));
+  letter-spacing: 0.05em;
+}
+
+/* --- the middle row ------------------------------------------------------- */
+
+.combat__middle {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: calc(var(--space) * 2);
+  min-height: 0;
+}
+
+.player {
+  display: flex;
+  gap: var(--space);
+  align-items: flex-start;
+}
+
+.player__portrait {
+  position: relative;
+  height: clamp(64px, 11vh, 128px);
+  flex: none;
+}
+
+.player__portrait .art {
+  height: 100%;
+  width: auto;
+  border: none;
+  background: none;
+}
+
+.player__stats {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space) * 0.5);
+  min-width: 0;
+}
+
+.player__hp {
+  display: flex;
+  align-items: center;
+  gap: var(--space);
+}
+
+.player__name {
+  font-family: var(--font-display);
+  font-size: calc(16px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.player__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--space) * 1.5);
+}
+
+.player__piles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space);
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-quiet);
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space) calc(var(--space) * 1.5);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--ink-strong);
+  min-width: 0;
+}
+
+.readout--prompt {
+  align-items: center;
+  justify-content: center;
+  border-left-color: var(--rule);
+  color: var(--ink-quiet);
+  font-family: var(--font-display);
+  font-style: italic;
+}
+
+.readout[data-fatal] {
+  border-left-color: var(--debt);
+}
+
+.readout__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space);
+  font-family: var(--font-display);
+  font-size: calc(16px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.readout__prompt {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 1px calc(var(--space) * 0.75);
+  border: 1px solid var(--ink-strong);
+}
+
+.readout__rules {
+  font-size: calc(13px * var(--font-scale));
+  line-height: 1.35;
+  color: var(--ink-strong);
+}
+
+.readout__line {
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  line-height: 1.5;
+}
+
+.readout__mark {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: calc(12px * var(--font-scale));
+  color: var(--ink-quiet);
+}
+
+.readout__warn {
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  color: var(--debt);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.readout__win {
+  font-family: var(--font-mono);
+  font-size: calc(12px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.record {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--rule);
+  padding-left: calc(var(--space) * 1.5);
+}
+
+.record__head {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-quiet);
+}
+
+.record__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
+  min-height: 0;
+  flex: 1;
+}
+
+.record__line {
+  display: grid;
+  grid-template-columns: 2.4em 1fr;
+  gap: var(--space);
+  font-size: calc(12px * var(--font-scale));
+  line-height: 1.4;
+}
+
+.record__beat {
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  color: var(--ink-quiet);
+  text-align: right;
+}
+
+.record__line[data-tone='debt'] {
+  color: var(--debt);
+}
+
+.record__line[data-tone='quiet'] {
+  color: var(--ink-quiet);
+}
+
+.record__line[data-tone='loud'] {
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+/* --- hand ----------------------------------------------------------------- */
+
+.hand {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: calc(var(--space) * 0.75);
+  min-height: var(--card-h);
+  padding-top: calc(var(--space) * 2);
+}
+
+.hand--empty {
+  color: var(--ink-quiet);
+  font-family: var(--font-display);
+  font-style: italic;
+  align-items: center;
+}
+
+.hand__slot {
+  position: relative;
+  flex: none;
+}
+
+/* The zoomed card has to sit over its neighbours, not under them. */
+.hand__slot:hover,
+.hand__slot:focus-within {
+  z-index: 10;
+}
+
+.hand__slot:has(.card[data-selected]) {
+  z-index: 9;
+}
+
+.card {
+  font: inherit;
+  width: var(--card-w);
+  height: var(--card-h);
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 2px;
+  padding: calc(var(--space) * 0.5);
+  border: 1px solid var(--ink-strong);
+  border-left: 4px solid var(--suit-tint);
+  background: var(--paper);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transform-origin: bottom center;
+}
+
+.card[data-selected] {
+  outline: 2px solid var(--ink-strong);
+  outline-offset: 2px;
+}
+
+.card[data-unplayable] {
+  cursor: not-allowed;
+  background: color-mix(in srgb, var(--chalk) 45%, var(--paper));
+  color: var(--ink-quiet);
+}
+
+.card[data-suit='compound'] {
+  background: var(--void);
+  color: var(--chalk);
+  border-color: var(--debt);
+}
+
+.card__top {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  line-height: 1;
+}
+
+.card__weight {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25em;
+  font-family: var(--font-mono);
+}
+
+.card__weightNum {
+  font-size: calc(15px * var(--font-scale));
+  font-weight: 700;
+  color: inherit;
+}
+
+.card__weightLabel {
+  font-size: calc(8px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-quiet);
+}
+
+.card__weight[data-discounted] .card__weightNum {
+  text-decoration: underline;
+}
+
+.card__key {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: calc(9px * var(--font-scale));
+  border: 1px solid var(--rule);
+  padding: 0 0.35em;
+  color: var(--ink-quiet);
+}
+
+.card__type {
+  font-family: var(--font-mono);
+  font-size: calc(8px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Card illustrations are 768x576 per the art contract. Give them their 4:3 or the crop
+   throws away most of the drawing. */
+.card__art {
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.card__art .art {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.card__name {
+  font-family: var(--font-display);
+  font-size: calc(12px * var(--font-scale));
+  color: inherit;
+  line-height: 1.15;
+}
+
+.card[data-suit='compound'] .card__name,
+.card[data-suit='compound'] .card__weightNum {
+  color: var(--paper);
+}
+
+/* Long cards clip here rather than blowing the card open. The readout under the hand
+   carries the full text for whichever card the cursor or the mouse is on, so nothing is
+   ever only readable by hovering. */
+.card__text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  font-size: calc(10px * var(--font-scale));
+  line-height: 1.25;
+  overflow: hidden;
+}
+
+.card__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.3em;
+  font-family: var(--font-mono);
+  font-size: calc(8px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-quiet);
+  border-top: 1px solid var(--hair);
+  padding-top: 2px;
+}
+
+.card__mark {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nothing in the fight is smaller than this and still legible. */
+@media (max-height: 760px) {
+  .combat {
+    gap: var(--space);
+  }
+
+  .card__foot {
+    display: none;
+  }
+}

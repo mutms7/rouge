@@ -15,7 +15,7 @@
  * Bonuses land before reductions on purpose. A +1 attack Mark should be worth the same
  * to you whether or not the thing you are hitting is buried in paperwork.
  */
-import { ECHO_WEIGHT_PENALTY, STRAIN_DAMAGE, STRAIN_THRESHOLD } from './constants';
+import { BEATS_PER_LAP, ECHO_WEIGHT_PENALTY, STRAIN_DAMAGE, STRAIN_THRESHOLD } from './constants';
 import { addToHand, drawCards, exhaustCard, removeFrom } from './deck';
 import { byId, claimOnce, countOf, emit, isCompound, nextUid, playerOf } from './draft';
 import type { Draft, DraftCombatant } from './draft';
@@ -23,7 +23,7 @@ import { collectMods, scaledValue } from './mods';
 import type { Passives } from './mods';
 import { nextInt } from './rng';
 import { isAlive, lapOf, opponentsOf } from './tally';
-import type { CardDef, CardInstance, Effect, IntentDef } from './types';
+import type { CardDef, CardInstance, Effect, IntentDef, Mod } from './types';
 
 export type EffectContext = {
   readonly actorId: string;
@@ -96,20 +96,36 @@ export function handPassives(draft: Draft): Passives {
 // Guard
 // ---------------------------------------------------------------------------
 
-/** Guard decays 1 per beat elapsed, unless it has been frozen or slowed. §3.3. */
-export function decayGuard(combatant: DraftCombatant, from: number, to: number): void {
+/**
+ * What Guard is worth after the clock moves from `from` to `to`. Decays 1 per beat
+ * elapsed, unless it has been frozen or slowed. §3.3.
+ *
+ * Pure, and separate from `decayGuard`, because phase 3's hover preview has to answer
+ * "how much of this Guard survives until the enemy actually swings" and there must be
+ * exactly one implementation of that arithmetic. A preview that disagrees with the
+ * engine is worse than no preview.
+ */
+export function guardAfterDecay(
+  combatant: { readonly guard: number; readonly guardFrozenUntil: number; readonly mods: readonly Mod[] },
+  from: number,
+  to: number,
+): number {
   const span = to - from;
-  if (span <= 0 || combatant.guard <= 0) return;
+  if (span <= 0 || combatant.guard <= 0) return Math.max(0, combatant.guard);
 
   const passives = passivesOf(combatant);
   // A Widow's Thimble: nothing melts during lap 0 at all.
-  if (passives.guardNoDecayFirstLap && to <= 24) return;
+  if (passives.guardNoDecayFirstLap && to <= BEATS_PER_LAP) return combatant.guard;
 
   const frozen = Math.max(0, Math.min(combatant.guardFrozenUntil, to) - from);
   const beats = span - frozen;
-  if (beats <= 0) return;
+  if (beats <= 0) return combatant.guard;
   const rate = Math.max(0, 1 - passives.guardDecaySlower);
-  combatant.guard = Math.max(0, combatant.guard - Math.floor(beats * rate));
+  return Math.max(0, combatant.guard - Math.floor(beats * rate));
+}
+
+export function decayGuard(combatant: DraftCombatant, from: number, to: number): void {
+  combatant.guard = guardAfterDecay(combatant, from, to);
 }
 
 function gainGuard(draft: Draft, combatant: DraftCombatant, n: number, frozenFor: number | undefined): void {
