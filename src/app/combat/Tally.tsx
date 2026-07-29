@@ -52,7 +52,13 @@ function IntentChip({ intent, flagged, duration }: {
       animate={{ x: `${String(intent.offset * 100)}%` }}
       transition={{ duration, ease: 'easeOut' }}
     >
-      <div className="intent" data-flagged={flagged || undefined} title={label} aria-label={label}>
+      <div
+        className="intent"
+        data-flagged={flagged || undefined}
+        data-reink={intent.reink || undefined}
+        title={label}
+        aria-label={intent.reink ? strings.combat.reinkIntent(label) : label}
+      >
         {intent.chips.slice(0, 2).map((chip, i) => (
           <ChipBadge chip={chip} key={`${chip.code}${String(i)}`} />
         ))}

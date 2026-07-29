@@ -7,8 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ENCOUNTERS } from '../content/enemies';
-import { buildReport, formatOutliers, formatReport } from './report';
+import { buildReport, buildRunReport, formatOutliers, formatReport, formatRunReport } from './report';
 import { chooseAction, incomingDamage, scoreAction } from './policy';
+import { runWhole } from './run';
 import { buildDeck, runTrial } from './trial';
 import { createCombat } from '../engine/combat';
 import { fightSetup } from '../content/library';
@@ -97,5 +98,57 @@ describe('the report', () => {
 
     expect(formatReport(report)).toContain('overall win rate');
     expect(formatOutliers(report)).toContain('never played');
+  });
+});
+
+describe('whole-run simulation', () => {
+  it('reaches a terminal full Act 1 run rather than stopping at a prompt', () => {
+    const result = runWhole(3);
+    expect(result.outcome).not.toBe('timeout');
+    expect(result.depth).toBe(12);
+    expect(result.combats.at(-1)?.encounterId).toBe('the_notary');
+  });
+
+  it('is byte-stable for a whole run seed', () => {
+    expect(runWhole(17)).toEqual(runWhole(17));
+  });
+
+  it('formats useful run-level balance columns', () => {
+    const report = buildRunReport([runWhole(3)], 3);
+    const text = formatRunReport(report);
+    expect(text).toContain('overall run win rate');
+    expect(text).toContain('depth avg');
+    expect(text).toContain('Interest');
+    expect(text).toContain('The Notary');
+  });
+
+  it('reports metrics from the active combat when a run times out', () => {
+    // 165 run actions lands part-way through the Notary after an Interest bill and several
+    // cards have resolved. A stale `lastCombat` read would report the prior Tithe-Wolf fight,
+    // including its zero damage, instead of this active board.
+    const result = runWhole(3, { maxActions: 165 });
+    const current = result.combats.at(-1);
+    expect(result.outcome).toBe('timeout');
+    expect(current?.encounterId).toBe('the_notary');
+    expect(current?.outcome).toBe('timeout');
+    expect(current?.beats).toBeGreaterThan(0);
+    expect(current?.damageTaken).toBeGreaterThan(0);
+    expect(current?.interestEvents).toBeGreaterThan(0);
+    expect(Object.keys(current?.played ?? {})).not.toHaveLength(0);
+    expect(current?.hpAfter).toBeLessThan(current?.hpBefore ?? Number.POSITIVE_INFINITY);
+    expect(result.hpCurve.at(-1)).toBe(current?.hpAfter);
+    expect(buildRunReport([result], 3).avgFinalHp).toBe(current?.hpAfter);
+  });
+
+  it('uses combat-appearance denominators and names card variants by their base card', () => {
+    const run = runWhole(3);
+    const report = buildRunReport([run], 3);
+    const variant = report.cards.find((card) => card.id === 'flinch+');
+    expect(variant).toBeDefined();
+    expect(variant?.name).toBe('Flinch');
+    expect(variant?.played ?? 0).toBeGreaterThanOrEqual(variant?.playAppearances ?? 0);
+    expect(variant?.playWins ?? 0).toBeLessThanOrEqual(variant?.playAppearances ?? 0);
+    expect(variant?.winRate).toBe((variant?.playWins ?? 0) / Math.max(1, variant?.playAppearances ?? 0));
+    expect(run.played.discard_compound).toBeUndefined();
   });
 });

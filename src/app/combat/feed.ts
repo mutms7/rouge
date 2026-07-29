@@ -12,7 +12,9 @@
  * here can desync, because nothing in here holds state.
  */
 import type { CardDef, CombatState, LogEntry } from '../../engine/types';
+import { MARKS } from '../../content/marks';
 import { displayNames } from './names';
+import { strings } from '../strings';
 
 export type LogTone = 'plain' | 'debt' | 'quiet' | 'loud';
 
@@ -132,12 +134,21 @@ function lineFor(entry: LogEntry, naming: Naming): { text: string; tone: LogTone
       return { text: `${naming.nameOf(event.who)} takes ${String(event.amount)} Salt off you.`, tone: 'debt' };
     case 'compound':
       return { text: `${naming.cardName(event.cardId)} is written into your ${event.to}.`, tone: 'debt' };
+    case 'interest':
+      return { text: strings.combat.interestDue(event.count, event.load), tone: 'debt' };
     case 'compound_removed':
       return { text: `${naming.cardName(event.cardId)} struck out.`, tone: 'plain' };
     case 'returned':
       return { text: `${naming.cardName(event.cardId)} comes back to hand.`, tone: 'plain' };
     case 'vulnerable':
       return { text: `${naming.nameOf(event.who)} is re-inking.`, tone: 'loud' };
+    case 'countersign_cancelled':
+      return { text: strings.combat.countersignCanceled(event.lap, entry.beat), tone: 'loud' };
+    case 'mark_stamped':
+      return {
+        text: strings.combat.markStamped(MARKS[event.markId]?.name ?? titleCase(event.markId), event.lap),
+        tone: 'debt',
+      };
     case 'phase':
       return { text: `${naming.nameOf(event.who)} turns the page.`, tone: 'loud' };
     case 'ward_spent':

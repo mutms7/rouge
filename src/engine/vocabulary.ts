@@ -124,8 +124,8 @@ export const MOD_VOCAB: Readonly<Record<ModKind, VocabEntry>> = {
   on_ally_death_double: { scope: 'combat', live: true },
   salt_hoard_decay: { scope: 'combat', live: true },
   phase_at_hp_pct: { scope: 'combat', live: true },
-  countersign: { scope: 'combat', live: false, owner: 'phase 5, the Notary' },
-  stamp_marks: { scope: 'combat', live: false, owner: 'phase 5, the Notary' },
+  countersign: { scope: 'combat', live: true },
+  stamp_marks: { scope: 'combat', live: true },
 
   // Threefold rewrites how a perjury resolves rather than scaling it, which is why it
   // waited for the phase where a Mark can actually be granted.
@@ -134,9 +134,9 @@ export const MOD_VOCAB: Readonly<Record<ModKind, VocabEntry>> = {
   // The run above combat. `salt_per_lap` is the odd one: income on the lap clock, so the
   // Tally is what fires it even though the Salt outlives the fight.
   mark_slots: { scope: 'run', live: true },
-  card_load: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  interest_compounds: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  interest_period: { scope: 'run', live: false, owner: 'phase 5, Interest' },
+  card_load: { scope: 'run', live: true },
+  interest_compounds: { scope: 'run', live: true },
+  interest_period: { scope: 'run', live: true },
   assay_discount_pct: { scope: 'run', live: true },
   purchase_fails_one_in: { scope: 'run', live: true },
   salt_per_win: { scope: 'run', live: true },
@@ -147,10 +147,10 @@ export const MOD_VOCAB: Readonly<Record<ModKind, VocabEntry>> = {
   survive_lethal_run: { scope: 'run', live: true },
   reveal_map_layer: { scope: 'run', live: true },
   reveal_elite_intents: { scope: 'run', live: false, owner: 'phase 5, the boss intent panel' },
-  first_compound_becomes: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  compound_playable_as: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  compound_discard_free: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  replicates: { scope: 'run', live: false, owner: 'phase 5, Interest' },
+  first_compound_becomes: { scope: 'run', live: true },
+  compound_playable_as: { scope: 'run', live: true },
+  compound_discard_free: { scope: 'run', live: true },
+  replicates: { scope: 'run', live: true },
   irremovable: { scope: 'run', live: true },
   compound_phase: { scope: 'run', live: true },
 };

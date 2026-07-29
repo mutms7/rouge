@@ -28,6 +28,11 @@ describe('keyboard play', () => {
     }
   });
 
+  it('offers the selected Compound discard binding while not targeting', () => {
+    expect(intentForKey('d', playing)).toEqual({ k: 'discard' });
+    expect(intentForKey('D', picking)).toBeNull();
+  });
+
   it('repurposes left and right while targeting', () => {
     expect(intentForKey('ArrowLeft', picking)).toEqual({ k: 'target_move', by: -1 });
     expect(intentForKey('Enter', picking)).toEqual({ k: 'commit' });

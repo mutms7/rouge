@@ -15,6 +15,7 @@ import { useDuration } from '../settings';
 import { strings } from '../strings';
 import type { Flash } from './feed';
 import { displayNames } from './names';
+import { isNotaryBody, notaryStatus } from './notary';
 import type { PreviewBody } from './preview';
 import { summarize } from './summary';
 import type { CombatState, Combatant } from '../../engine/types';
@@ -105,6 +106,7 @@ export function EnemyBoard({ state, flashes, preview, targetId, onHover, onPick 
   const shake = useDuration(0.3);
   const bodies = state.combatants.filter((c) => c.team === 'enemy');
   const names = displayNames(state);
+  const status = notaryStatus(state);
 
   return (
     <div className="bodies">
@@ -137,7 +139,7 @@ export function EnemyBoard({ state, flashes, preview, targetId, onHover, onPick 
 
             <div className="body__name">
               {names[body.id] ?? body.name}
-              {body.phases.length > 0 && body.phase > 1 ? (
+              {isNotaryBody(body) || (body.phases.length > 0 && body.phase > 1) ? (
                 <span className="body__phase">{strings.combat.phase(body.phase)}</span>
               ) : null}
             </div>
@@ -156,7 +158,11 @@ export function EnemyBoard({ state, flashes, preview, targetId, onHover, onPick 
               <div className="body__stats">
                 <Stat label={strings.combat.guard} value={body.guard} {...(ahead ? { after: ahead.guardAfter } : {})} />
                 {body.bleed > 0 ? <Stat label={strings.combat.bleed} value={body.bleed} /> : null}
-                {body.vulnerableUntil > state.beat ? <span className="tag">{strings.combat.reink}</span> : null}
+                {isNotaryBody(body) && status?.active ? (
+                  <span className="tag" aria-label={strings.combat.reinkActive(status.window.multiplier, status.remaining)}>
+                    {strings.combat.reinkTag(status.window.multiplier, status.remaining)}
+                  </span>
+                ) : null}
               </div>
             )}
 

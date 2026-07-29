@@ -330,9 +330,14 @@ export function combatSetupAt(state: RunState, node: RunNode): CombatSetup {
       maxHp: state.maxHp,
       mods: [...mods, ...ward],
       salt: state.salt,
+      markIds: state.marks,
+      markMods: state.content.markMods,
     },
     enemies,
     deck: state.deck.map((card) => card.cardId),
+    deckLoad: deckLoadOf(state),
+    interestPeriod: passives.interestPeriod > 0 ? passives.interestPeriod : undefined,
+    compoundIds: state.content.compoundIds,
   };
 }
 
@@ -670,6 +675,16 @@ function finishCombat(draft: Draft, node: RunNode): void {
   const combat = draft.combat;
   if (!combat) return;
   const player = combat.combatants.find((c) => c.team === 'player');
+
+  // Interest Owed is the one Compound that survives a combat. Every copy still
+  // present in any combat zone breeds one persistent copy in the run deck. Exhausting
+  // it through Absolved still counts: the debt was carried, not removed.
+  const owedCopies = [combat.deck.draw, combat.deck.hand, combat.deck.discard, combat.deck.exhausted]
+    .flat()
+    .filter((card) => card.cardId === 'interest_owed').length;
+  if (owedCopies > 0 && draft.content.library['interest_owed']) {
+    for (let i = 0; i < owedCopies; i += 1) addCard(draft, 'interest_owed');
+  }
 
   draft.hp = player ? Math.max(0, player.hp) : 0;
   draft.salt = combat.salt;

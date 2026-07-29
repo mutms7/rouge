@@ -21,7 +21,7 @@ import { byId, claimOnce, countOf, emit, isCompound, nextUid, playerOf } from '.
 import type { Draft, DraftCombatant } from './draft';
 import { collectMods, scaledValue } from './mods';
 import type { Passives } from './mods';
-import { nextInt } from './rng';
+import { nextInt, shuffle } from './rng';
 import { isAlive, lapOf, opponentsOf } from './tally';
 import type { CardDef, CardInstance, Effect, IntentDef, Mod } from './types';
 
@@ -205,7 +205,16 @@ export function dealDamage(
     if (ally && isAlive(ally)) incoming = Math.ceil(incoming * (1 - shield.pct / 100));
   }
   // The stamp needs ink, and while it is re-inking everything lands three times as hard.
-  if (draft.beat < target.vulnerableUntil) incoming = incoming * target.vulnerableMultiplier;
+  if (draft.beat < target.vulnerableUntil) {
+    incoming = incoming * target.vulnerableMultiplier;
+    if (target.team === 'enemy' && passivesOf(target).countersign) {
+      const lap = lapOf(draft.beat);
+      if (draft.countersignCancelledLap !== lap) {
+        draft.countersignCancelledLap = lap;
+        emit(draft, { k: 'countersign_cancelled', who: target.id, lap });
+      }
+    }
+  }
 
   let blocked = 0;
   let remaining = incoming;
@@ -223,6 +232,9 @@ export function dealDamage(
   if (remaining > 0 && options.fizzlesPerjury !== false) fizzlePerjuries(draft, targetId);
 
   if (isAlive(target)) {
+    // Boss phase thresholds are HP-driven, so a play that crosses 50% must stop
+    // countersigning immediately rather than waiting for the Notary's next action.
+    checkDamagePhase(draft, target);
     if (remaining > 0) checkHpTriggers(draft, target, targetPassives);
     return;
   }
@@ -235,6 +247,18 @@ export function dealDamage(
   emit(draft, { k: 'death', who: targetId });
   fizzlePerjuries(draft, targetId);
   onDeath(draft, target, options.attackerId ?? null);
+}
+
+function checkDamagePhase(draft: Draft, target: DraftCombatant): void {
+  const thresholds = passivesOf(target).phaseAtHpPct;
+  const next = target.phases[target.phase - 1];
+  if (thresholds.length === 0 || !next) return;
+  const threshold = thresholds[target.phase - 1] ?? thresholds[0];
+  if (threshold === undefined || target.hp * 100 > target.maxHp * threshold) return;
+  target.phase += 1;
+  target.intents = next;
+  target.intentIndex = 0;
+  emit(draft, { k: 'phase', who: target.id, phase: target.phase });
 }
 
 /** Half a Locket: an emergency wall the first time you drop under the line. */
@@ -450,12 +474,43 @@ function seedDiscard(draft: Draft, n: number): void {
 }
 
 function compoundIdsIn(draft: Draft): string[] {
-  return Object.keys(draft.library)
-    .filter((id) => draft.library[id]?.playable === false)
-    .sort();
+  return [...draft.compoundIds];
 }
 
 /** Interest's little gifts, and what Collector's Interest sells you Salt for. */
+export function addCompoundCard(
+  draft: Draft,
+  cardId: string,
+  to: 'draw' | 'hand' | 'discard' = 'draw',
+  shuffleIntoDraw = false,
+): void {
+  const player = playerOf(draft);
+  // The Nib changes only the first generated Compound in a combat, regardless of
+  // whether it came from Interest or the Notary's countersign.
+  if (player && passivesOf(player).firstCompoundBecomes.length > 0 && claimOnce(draft, 'first_compound_generated')) {
+    cardId = passivesOf(player).firstCompoundBecomes[0] ?? cardId;
+  }
+  const instance: CardInstance = { uid: nextUid(draft, 'x'), cardId, weightDelta: 0 };
+  const def = draft.library[cardId];
+  if (def) {
+    const playerLoad = player ? passivesOf(player).cardLoad : 0;
+    draft.deckLoad += (def.load ?? def.weight) + playerLoad;
+  }
+  if (to === 'hand') {
+    if (!addToHand(draft, instance)) draft.deck.draw.push(instance);
+  } else if (to === 'discard') {
+    draft.deck.discard.push(instance);
+  } else {
+    draft.deck.draw.push(instance);
+    if (shuffleIntoDraw) {
+      const [shuffled, rng] = shuffle(draft.rng.shuffle, draft.deck.draw);
+      draft.deck.draw = shuffled;
+      draft.rng = { ...draft.rng, shuffle: rng };
+    }
+  }
+  emit(draft, { k: 'compound', uid: instance.uid, cardId, to });
+}
+
 function addCompounds(draft: Draft, effect: Extract<Effect, { k: 'add_compound' }>): void {
   const pool = compoundIdsIn(draft);
   if (pool.length === 0) return;
@@ -464,15 +519,7 @@ function addCompounds(draft: Draft, effect: Extract<Effect, { k: 'add_compound' 
     draft.rng = { ...draft.rng, rewards: rng };
     const cardId = pool[index];
     if (cardId === undefined) return;
-    const instance: CardInstance = { uid: nextUid(draft, 'x'), cardId, weightDelta: 0 };
-    if (effect.to === 'hand') {
-      if (!addToHand(draft, instance)) draft.deck.draw.push(instance);
-    } else if (effect.to === 'discard') {
-      draft.deck.discard.push(instance);
-    } else {
-      draft.deck.draw.push(instance);
-    }
-    emit(draft, { k: 'compound', uid: instance.uid, cardId, to: effect.to });
+    addCompoundCard(draft, cardId, effect.to);
   }
 }
 
@@ -485,6 +532,12 @@ function removeCompounds(draft: Draft, limit: number): number {
       if (!instance || !isCompound(draft, instance.cardId)) continue;
       zone.splice(i, 1);
       removed += 1;
+      const def = draft.library[instance.cardId];
+      if (def) {
+        const player = playerOf(draft);
+        const playerLoad = player ? passivesOf(player).cardLoad : 0;
+        draft.deckLoad = Math.max(0, draft.deckLoad - ((def.load ?? def.weight) + playerLoad));
+      }
       emit(draft, { k: 'compound_removed', cardId: instance.cardId });
     }
     if (removed >= limit) break;

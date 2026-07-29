@@ -22,6 +22,7 @@ export type HandCard = {
   readonly face: CardFaceData;
   readonly weight: number;
   readonly printedWeight: number;
+  readonly discardable: boolean;
 };
 
 export type HandProps = {
@@ -31,9 +32,10 @@ export type HandProps = {
   readonly interactive: boolean;
   readonly onHover: (uid: string | null) => void;
   readonly onActivate: (uid: string) => void;
+  readonly onDiscard: (uid: string) => void;
 };
 
-export function Hand({ cards, cursor, hovered, interactive, onHover, onActivate }: HandProps) {
+export function Hand({ cards, cursor, hovered, interactive, onHover, onActivate, onDiscard }: HandProps) {
   const duration = useDuration(0.22);
 
   if (cards.length === 0) {
@@ -71,6 +73,19 @@ export function Hand({ cards, cursor, hovered, interactive, onHover, onActivate 
                 onActivate(card.uid);
               }}
             />
+            {card.discardable ? (
+              <button
+                type="button"
+                className="card__discard"
+                disabled={!interactive}
+                aria-label={strings.combat.discardCompound(card.face.def.name)}
+                onClick={() => {
+                  onDiscard(card.uid);
+                }}
+              >
+                {strings.combat.discardZero}
+              </button>
+            ) : null}
           </motion.div>
         ))}
       </AnimatePresence>

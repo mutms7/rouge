@@ -19,6 +19,7 @@
  *   escape         back out of targeting, or clear the zoom.
  *   w              wait: spend a beat, draw a card. There is no end-turn button, so this
  *                  is the only way to pass, and Stillness makes it a real choice.
+ *   d              discard the selected Compound at zero Weight when Familiar makes it legal.
  *   f              hold for fast-forward. Held rather than toggled, so it cannot be left
  *                  on by accident, and there is a toggle in the UI for people who want it
  *                  permanently.
@@ -35,6 +36,7 @@ export type CombatIntent =
   | { readonly k: 'cursor'; readonly to: number }
   | { readonly k: 'cursor_move'; readonly by: number }
   | { readonly k: 'commit' }
+  | { readonly k: 'discard' }
   | { readonly k: 'target_move'; readonly by: number }
   | { readonly k: 'cancel' }
   | { readonly k: 'wait' }
@@ -83,6 +85,7 @@ export function intentForKey(key: string, context: KeyContext): CombatIntent | n
   if (lower === 'arrowleft') return { k: 'cursor_move', by: -1 };
   if (lower === 'arrowright') return { k: 'cursor_move', by: 1 };
   if (lower === 'enter' || lower === ' ' || lower === 'arrowup') return { k: 'commit' };
+  if (lower === 'd') return { k: 'discard' };
   if (lower === 'w') return { k: 'wait' };
 
   const digit = DIGITS.indexOf(lower);

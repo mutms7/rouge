@@ -16,4 +16,5 @@
 export * from './estimate';
 export * from './policy';
 export * from './report';
+export * from './run';
 export * from './trial';

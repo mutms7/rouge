@@ -33,6 +33,24 @@ describe('the record', () => {
     const lines = logLines(state, namingFor(state)).map((l) => l.text);
     expect(lines.some((text) => text.includes('draw'))).toBe(false);
   });
+
+  it('names Interest, a canceled Countersign, and a stamped Mark when those events exist', () => {
+    const state = fight('the_notary');
+    const withEvents = {
+      ...state,
+      log: [
+        ...state.log,
+        { beat: 24, event: { k: 'interest' as const, load: 12, count: 3, period: 24, beat: 24 } },
+        { beat: 25, event: { k: 'countersign_cancelled' as const, who: 'the_notary', lap: 1 } },
+        { beat: 26, event: { k: 'mark_stamped' as const, who: 'the_notary', markId: 'whetted', lap: 1 } },
+      ],
+    };
+    const lines = logLines(withEvents, namingFor(withEvents)).map((line) => line.text);
+
+    expect(lines).toContain('Interest due: 3 Compounds · Load 12.');
+    expect(lines).toContain('Countersign canceled on lap 1 (beat 25).');
+    expect(lines).toContain('Whetted stamped on lap 1.');
+  });
 });
 
 describe('flashes', () => {

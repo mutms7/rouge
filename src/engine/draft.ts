@@ -40,7 +40,9 @@ type DraftArrays =
   | 'rng'
   | 'boons'
   | 'wards'
-  | 'spent';
+  | 'spent'
+  | 'activeMarkIds'
+  | 'stampedMarks';
 
 export type Draft = Mutable<Omit<CombatState, DraftArrays>> & {
   combatants: DraftCombatant[];
@@ -59,6 +61,8 @@ export type Draft = Mutable<Omit<CombatState, DraftArrays>> & {
   boons: ActiveBoon[];
   wards: Ward[];
   spent: string[];
+  activeMarkIds: string[];
+  stampedMarks: string[];
 };
 
 export function cloneState(state: CombatState): Draft {
@@ -94,6 +98,16 @@ export function cloneState(state: CombatState): Draft {
     lastPlayBeat: state.lastPlayBeat,
     wards: [...state.wards],
     spent: [...state.spent],
+    activeMarkIds: [...state.activeMarkIds],
+    stampedMarks: [...state.stampedMarks],
+    deckLoad: state.deckLoad,
+    interestPeriod: state.interestPeriod,
+    interestNextBeat: state.interestNextBeat,
+    interestLoad: state.interestLoad,
+    countersignCancelledLap: state.countersignCancelledLap,
+    markMods: state.markMods,
+    basePlayerMods: state.basePlayerMods,
+    compoundIds: [...state.compoundIds],
   };
 }
 
@@ -118,7 +132,7 @@ export function nextUid(draft: Draft, prefix: string): string {
 
 /** Whether a card id is one of Interest's little gifts. Compounds are unplayable junk. */
 export function isCompound(draft: Draft, cardId: string): boolean {
-  return draft.library[cardId]?.playable === false;
+  return draft.compoundIds.includes(cardId);
 }
 
 /**

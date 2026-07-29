@@ -7,7 +7,7 @@
  * are not about attention at all, so they are functions of a state and nothing else, and they
  * are testable without a store.
  */
-import { currentActor } from '../../engine/combat';
+import { currentActor, legalActions } from '../../engine/combat';
 import { isAlive } from '../../engine/tally';
 import type { Action, CombatState, Combatant } from '../../engine/types';
 
@@ -35,6 +35,32 @@ export function needsTarget(state: CombatState, uid: string): boolean {
 export function playAction(state: CombatState, uid: string, targetId?: string): Action {
   if (targetId === undefined || !needsTarget(state, uid)) return { k: 'play_card', uid };
   return { k: 'play_card', uid, targetId };
+}
+
+/** The legal choices for one held card, from the engine's action list. */
+export function legalCardActions(state: CombatState, uid: string): {
+  readonly play: readonly Extract<Action, { readonly k: 'play_card' }>[];
+  readonly discard: Extract<Action, { readonly k: 'discard_compound' }> | null;
+} {
+  const play: Extract<Action, { readonly k: 'play_card' }>[] = [];
+  let discard: Extract<Action, { readonly k: 'discard_compound' }> | null = null;
+  for (const action of legalActions(state)) {
+    if (action.k === 'play_card' && action.uid === uid) play.push(action);
+    if (action.k === 'discard_compound' && action.uid === uid) discard = action;
+  }
+  return { play, discard };
+}
+
+/** Compare an app action with the engine's legal action list, including its UID. */
+export function isLegalCombatAction(state: CombatState, action: Action): boolean {
+  return legalActions(state).some((legal) => {
+    if (legal.k !== action.k) return false;
+    if (legal.k === 'play_card' && action.k === 'play_card') {
+      return legal.uid === action.uid && (legal.targetId ?? null) === (action.targetId ?? null);
+    }
+    if (legal.k === 'discard_compound' && action.k === 'discard_compound') return legal.uid === action.uid;
+    return true;
+  });
 }
 
 /** Whoever the track says acts next, or null once the fight is decided. */

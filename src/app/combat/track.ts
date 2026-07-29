@@ -16,6 +16,7 @@ import { guardAfterDecay } from '../../engine/effects';
 import { isAlive, lapOf, trackBeat, visibleIntents } from '../../engine/tally';
 import type { CombatState, Combatant, IntentDef, Team } from '../../engine/types';
 import { displayNames } from './names';
+import { isReinkIntent } from './notary';
 import { intentDamage, summarize, type Chip } from './summary';
 
 /** How many beats the strip shows. One lap, per §3.4: you read the whole window. */
@@ -48,6 +49,8 @@ export type TrackIntent = {
   readonly offset: number;
   readonly intent: IntentDef;
   readonly chips: readonly Chip[];
+  /** The Notary's two-beat vulnerability trigger, called out on the track. */
+  readonly reink: boolean;
   /** Damage this one puts on you, for the preview arithmetic and the chip emphasis. */
   readonly damage: number;
 };
@@ -162,6 +165,7 @@ export function trackView(state: CombatState, currentId: string | null): TrackVi
           offset: p.beat - start,
           intent: p.intent,
           chips: summarize(p.intent.effects, { by: 'enemy' }),
+          reink: isReinkIntent(p.intent.effects),
           damage: p.intent.targeting === 'none' || p.intent.targeting === 'self' ? 0 : intentDamage(p.intent.effects),
         })),
     });

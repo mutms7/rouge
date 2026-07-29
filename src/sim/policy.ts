@@ -95,13 +95,17 @@ export function scoreAction(state: CombatState, action: Action): number {
     return WEIGHTS.draw / 2;
   }
 
+  // Collector's Interest can make Compounds discardable when a passive grants the free
+  // discard. It costs no Weight and removes a dead draw, so always prefer it to waiting.
+  if (action.k === 'discard_compound') return WEIGHTS.junk * 2;
+
   const instance = state.deck.hand.find((c) => c.uid === action.uid);
   if (!instance) return Number.NEGATIVE_INFINITY;
   const def = state.library[instance.cardId];
   if (!def) return Number.NEGATIVE_INFINITY;
   const weight = effectiveWeight(state, action.uid) ?? def.weight;
 
-  const targets = targetsOf(state, def.effects, action.targetId);
+  const targets = targetsOf(state, def.effects, action.k === 'play_card' ? action.targetId : undefined);
   const targetCount = def.targeting === 'all_opponents' ? Math.max(1, targets.length) : 1;
   const estimate = estimateEffects(state, def.effects, targetCount);
 

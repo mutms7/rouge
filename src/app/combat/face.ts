@@ -12,8 +12,9 @@
  */
 import { CARDS } from '../../content/cards';
 import type { Suit } from '../../content/palette';
-import { cardText } from '../../content/rules-text';
+import { cardText, describeEffects } from '../../content/rules-text';
 import type { Card } from '../../content/types';
+import { collectMods } from '../../engine/mods';
 import type { CardDef, CombatState } from '../../engine/types';
 
 export type CardFaceData = {
@@ -28,32 +29,44 @@ export type CardFaceData = {
   readonly playable: boolean;
 };
 
-export function faceOf(state: CombatState, cardId: string): CardFaceData | null {
+function textFor(state: CombatState, def: CardDef, known: Card | undefined, playable: boolean): string {
+  const ordinary = known
+    ? cardText(known)
+    : cardText({ ...def, suit: 'neutral', rarity: 'neutral', mark: null } as Card);
+  if (!playable || !state.compoundIds.includes(def.id)) return ordinary;
+
+  const player = state.combatants.find((body) => body.team === 'player');
+  const effects = collectMods(player?.mods ?? []).compoundPlayableAs;
+  return effects.length > 0 ? describeEffects(effects) : ordinary;
+}
+
+export function faceOf(state: CombatState, cardId: string, playableOverride?: boolean): CardFaceData | null {
   const def = state.library[cardId];
   if (!def) return null;
   const known: Card | undefined = CARDS[cardId];
+  const playable = playableOverride ?? def.playable !== false;
 
   if (!known) {
     return {
       def,
       suit: 'neutral',
-      text: cardText({ ...def, suit: 'neutral', rarity: 'neutral', mark: null } as Card),
+      text: textFor(state, def, known, playable),
       flavour: null,
       markName: null,
       markText: null,
       known: false,
-      playable: def.playable !== false,
+      playable,
     };
   }
 
   return {
     def,
     suit: known.suit,
-    text: cardText(known),
+    text: textFor(state, def, known, playable),
     flavour: known.flavour ?? null,
     markName: known.mark?.name ?? null,
     markText: known.mark?.text ?? null,
     known: true,
-    playable: def.playable !== false,
+    playable,
   };
 }

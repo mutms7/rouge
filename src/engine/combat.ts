@@ -17,6 +17,7 @@ import { byId, claimOnce, cloneState, emit, playerOf } from './draft';
 import type { Draft, DraftCombatant } from './draft';
 import {
   applyEffects,
+  addCompoundCard,
   baseContext,
   dealDamage,
   decayGuard,
@@ -27,7 +28,7 @@ import {
 } from './effects';
 import type { EffectContext } from './effects';
 import { collectMods } from './mods';
-import { makeRngStreams, shuffle } from './rng';
+import { makeRngStreams, nextInt, shuffle } from './rng';
 import { cardWeight, frontBeat, isAlive, lapOf, nextActor, opponentsOf } from './tally';
 import type {
   Action,
@@ -40,8 +41,22 @@ import type {
   Combatant,
   Effect,
   IntentDef,
+  Mod,
   Targeting,
 } from './types';
+
+function modKey(mod: Mod): string {
+  return JSON.stringify(mod);
+}
+
+function subtractMods(all: readonly Mod[], remove: readonly Mod[]): Mod[] {
+  const remaining = [...all];
+  for (const mod of remove) {
+    const index = remaining.findIndex((candidate) => modKey(candidate) === modKey(mod));
+    if (index >= 0) remaining.splice(index, 1);
+  }
+  return remaining;
+}
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -72,6 +87,19 @@ export function createCombat(setup: CombatSetup): CombatState {
   const rng = makeRngStreams(setup.seed);
   const playerMods = setup.player.mods ?? [];
   const passives = collectMods(playerMods);
+  const interestPeriod = Math.max(1, setup.interestPeriod ?? (passives.interestPeriod || BEATS_PER_LAP));
+  const deckLoad = setup.deckLoad ?? setup.deck.reduce((total, cardId) => {
+    const card = setup.library[cardId];
+    return total + (card?.load ?? card?.weight ?? 0) + passives.cardLoad;
+  }, 0);
+  const interestLoad = setup.interestCompounds ?? 0;
+  const markMods = setup.player.markMods ?? {};
+  const activeMarkIds = [...(setup.player.markIds ?? [])];
+  const markedMods = activeMarkIds.flatMap((id) => markMods[id] ?? []);
+  // Run setups pass flattened Mark/Token mods in `player.mods`. Keep a copy of the
+  // remainder so phase-two stamping can rebuild the player's passives without guessing.
+  const basePlayerMods = subtractMods(playerMods, markedMods);
+  const compoundIds = [...(setup.compoundIds ?? Object.keys(setup.library).filter((id) => setup.library[id]?.playable === false).sort())];
   const maxHp = (setup.player.maxHp ?? setup.player.hp) + passives.maxHp;
 
   const player: Combatant = {
@@ -152,6 +180,16 @@ export function createCombat(setup: CombatSetup): CombatState {
     lastPlayBeat: 0,
     wards: [],
     spent: [],
+    deckLoad,
+    interestPeriod,
+    interestNextBeat: interestPeriod,
+    interestLoad,
+    countersignCancelledLap: null,
+    activeMarkIds,
+    stampedMarks: [],
+    markMods,
+    basePlayerMods,
+    compoundIds,
   };
 
   emit(draft, { k: 'combat_start' });
@@ -245,9 +283,9 @@ function countScale(state: CombatState, def: CardDef): number {
     case 'exhausted':
       return state.deck.exhausted.length;
     case 'compounds_in_discard':
-      return state.deck.discard.filter((c) => state.library[c.cardId]?.playable === false).length;
+      return state.deck.discard.filter((c) => state.compoundIds.includes(c.cardId)).length;
     case 'compounds_in_hand':
-      return state.deck.hand.filter((c) => state.library[c.cardId]?.playable === false).length;
+      return state.deck.hand.filter((c) => state.compoundIds.includes(c.cardId)).length;
     case 'missing_hp': {
       const player = state.combatants.find((c) => c.team === 'player');
       return player ? player.maxHp - player.hp : 0;
@@ -265,7 +303,11 @@ export function cardWeightInHand(state: CombatState, uid: string): number | null
 export function isPlayable(state: CombatState, uid: string): boolean {
   const instance = state.deck.hand.find((c) => c.uid === uid);
   if (!instance) return false;
-  return state.library[instance.cardId]?.playable !== false;
+  const def = state.library[instance.cardId];
+  if (!def) return false;
+  if (!state.compoundIds.includes(def.id) || def.playable !== false) return true;
+  const player = state.combatants.find((combatant) => combatant.team === 'player');
+  return (player ? collectMods(player.mods).compoundPlayableAs.length > 0 : false);
 }
 
 /**
@@ -284,11 +326,22 @@ export function legalActions(state: CombatState): Action[] {
   const actions: Action[] = [];
   for (const instance of state.deck.hand) {
     const def = state.library[instance.cardId];
-    if (!def || def.playable === false) continue;
+    if (!def) continue;
+    if (state.compoundIds.includes(def.id)) {
+      if (def.playable !== false || collectMods(player.mods).compoundPlayableAs.length > 0) {
+        actions.push({ k: 'play_card', uid: instance.uid });
+      }
+      continue;
+    }
     if (def.targeting === 'opponent' && foes.length > 1) {
       for (const foe of foes) actions.push({ k: 'play_card', uid: instance.uid, targetId: foe.id });
     } else {
       actions.push({ k: 'play_card', uid: instance.uid });
+    }
+  }
+  if (collectMods(player.mods).compoundDiscardFree) {
+    for (const instance of state.deck.hand) {
+      if (state.compoundIds.includes(instance.cardId)) actions.push({ k: 'discard_compound', uid: instance.uid });
     }
   }
   actions.push({ k: 'wait' });
@@ -315,6 +368,9 @@ export function reduce(state: CombatState, action: Action): CombatState {
   switch (action.k) {
     case 'play_card':
       playCard(draft, player, action.uid, action.targetId);
+      break;
+    case 'discard_compound':
+      discardCompound(draft, player, action.uid);
       break;
     case 'wait':
       emit(draft, { k: 'act', who: player.id, what: 'wait', weight: WAIT_WEIGHT });
@@ -396,7 +452,10 @@ function playCard(draft: Draft, player: DraftCombatant, uid: string, targetId: s
   if (!peek) throw new Error(`card ${uid} is not in hand`);
   const def: CardDef | undefined = draft.library[peek.cardId];
   if (!def) throw new Error(`unknown card ${peek.cardId}`);
-  if (def.playable === false) throw new Error(`${def.id} is unplayable: it just sits there`);
+  const compoundPlay = draft.compoundIds.includes(def.id);
+  const compoundEffects = passivesOf(player).compoundPlayableAs;
+  const replacementPlay = compoundPlay && compoundEffects.length > 0;
+  if (compoundPlay && def.playable === false && !replacementPlay) throw new Error(`${def.id} is unplayable: it just sits there`);
 
   // Weight, and any boon spent on it, are settled before the hand changes, so a card
   // that draws or discards cannot change what it cost.
@@ -431,12 +490,18 @@ function playCard(draft: Draft, player: DraftCombatant, uid: string, targetId: s
   // Perjure turns the next card into a promise: everything it does happens later, and
   // an unblocked hit in the meantime means none of it was ever true.
   const perjuryIn = boonPerjury(boons);
-  if (perjuryIn === null) {
+  if (replacementPlay) {
+    applyEffects(draft, compoundEffects, ctx);
+  } else if (perjuryIn === null) {
     applyEffects(draft, def.effects, ctx);
   } else {
     applyEffects(draft, [{ k: 'perjury', in: perjuryIn, effects: def.effects }], ctx);
   }
   if (boons.some((b) => b.echo === true)) applyEffects(draft, [{ k: 'echo' }], ctx);
+
+  // The Notary's stamp is a phase-one enemy trait. It is deliberately after the card
+  // resolves so a lethal play still receives the countersign only if the boss survives.
+  countersignCard(draft);
 
   // *After* the effects, not before. Recant says "return your last played card", and from
   // the player's side that is the card before Recant, not Recant itself. The Receipt Wraith
@@ -454,6 +519,31 @@ function playCard(draft: Draft, player: DraftCombatant, uid: string, targetId: s
     discardCard(draft, instance);
     fireDiscardTriggers(draft);
   }
+}
+
+function discardCompound(draft: Draft, player: DraftCombatant, uid: string): void {
+  if (!passivesOf(player).compoundDiscardFree) throw new Error('Compounds cannot be discarded for free');
+  const instance = draft.deck.hand.find((card) => card.uid === uid);
+  if (!instance || !isCompoundDef(draft, instance.cardId)) throw new Error(`${uid} is not a held Compound`);
+  removeFromHand(draft, uid);
+  emit(draft, { k: 'act', who: player.id, what: 'discard_compound', weight: 0 });
+  discardCard(draft, instance);
+  emit(draft, { k: 'discard', uid: instance.uid, cardId: instance.cardId });
+  fireDiscardTriggers(draft);
+}
+
+function isCompoundDef(draft: Draft, cardId: string): boolean {
+  return draft.compoundIds.includes(cardId);
+}
+
+function countersignCard(draft: Draft): void {
+  const lap = lapOf(draft.beat);
+  if (draft.countersignCancelledLap === lap) return;
+  const notary = draft.combatants.find(
+    (combatant) => combatant.team === 'enemy' && isAlive(combatant) && passivesOf(combatant).countersign && combatant.phase === 1,
+  );
+  if (!notary || !draft.library['the_notarys_countersign']) return;
+  addCompoundCard(draft, 'the_notarys_countersign', 'draw');
 }
 
 function boonPerjury(boons: readonly CardBoon[]): number | null {
@@ -655,7 +745,52 @@ function runLapEnd(draft: Draft, lap: number): void {
     const decay = passivesOf(combatant).saltHoardDecay;
     if (decay > 0 && combatant.saltHoard > 0) combatant.saltHoard = Math.max(0, combatant.saltHoard - decay);
   }
+  stampMarkAtLapEnd(draft, lap);
+  // Re-ink cancellation is scoped to the lap that just ended.
+  if (draft.countersignCancelledLap === lap) draft.countersignCancelledLap = null;
   runLapStart(draft);
+}
+
+function interestCount(load: number): number {
+  if (load >= 55) return 3;
+  if (load >= 40) return 2;
+  if (load >= 25) return 1;
+  return 0;
+}
+
+function runInterest(draft: Draft): void {
+  const player = playerOf(draft);
+  const modifiers = player ? passivesOf(player).interestCompounds : 0;
+  const count = Math.max(0, interestCount(draft.deckLoad) + draft.interestLoad + modifiers);
+  emit(draft, {
+    k: 'interest',
+    load: draft.deckLoad,
+    count,
+    period: draft.interestPeriod,
+    beat: draft.beat,
+  });
+  if (count <= 0 || draft.compoundIds.length === 0) return;
+  for (let i = 0; i < count; i += 1) {
+    const [index, rng] = nextInt(draft.rng.rewards, draft.compoundIds.length);
+    draft.rng = { ...draft.rng, rewards: rng };
+    const cardId = draft.compoundIds[index];
+    if (cardId !== undefined) addCompoundCard(draft, cardId, 'draw', true);
+  }
+}
+
+function stampMarkAtLapEnd(draft: Draft, lap: number): void {
+  const notary = draft.combatants.find(
+    (combatant) => combatant.team === 'enemy' && isAlive(combatant) && passivesOf(combatant).stampMarks > 0 && combatant.phase >= 2,
+  );
+  if (!notary) return;
+  const markId = draft.activeMarkIds[0];
+  if (!markId) return;
+  draft.activeMarkIds = draft.activeMarkIds.slice(1);
+  draft.stampedMarks.push(markId);
+  const marked = draft.markMods[markId] ?? [];
+  const player = playerOf(draft);
+  if (player) player.mods = subtractMods(player.mods, marked);
+  emit(draft, { k: 'mark_stamped', who: notary.id, markId, lap });
 }
 
 // ---------------------------------------------------------------------------
@@ -761,10 +896,20 @@ function settle(draft: Draft): void {
   for (let step = 0; step < MAX_RESOLVE_STEPS; step += 1) {
     if (finish(draft)) return;
 
+    // Resolve an Interest deadline that landed on the current beat before looking for
+    // the next marker. This is important when lap hooks leave every marker past a
+    // coincident 24-beat deadline.
+    if (draft.beat >= draft.interestNextBeat) {
+      runInterest(draft);
+      draft.interestNextBeat += draft.interestPeriod;
+      continue;
+    }
+
     const front = frontBeat(draft.combatants);
     if (front === null) continue;
     const boundary = (lapOf(draft.beat) + 1) * BEATS_PER_LAP;
     const stops = [front, boundary];
+    if (draft.interestNextBeat > draft.beat) stops.push(draft.interestNextBeat);
     const sworn = soonestBeat(draft.pending);
     if (sworn !== null) stops.push(sworn);
     const timed = soonestBeat(draft.scheduled);
@@ -774,6 +919,11 @@ function settle(draft: Draft): void {
     // A lap ends exactly once, whatever else is queued for the same beat.
     if (draft.beat === boundary && claimOnce(draft, `lap_end:${String(lapOf(draft.beat) - 1)}`)) {
       runLapEnd(draft, lapOf(draft.beat) - 1);
+      continue;
+    }
+    if (draft.beat >= draft.interestNextBeat) {
+      runInterest(draft);
+      draft.interestNextBeat += draft.interestPeriod;
       continue;
     }
     // Anything sworn for this beat happens before anybody acts on it.

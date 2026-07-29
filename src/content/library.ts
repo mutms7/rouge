@@ -86,6 +86,7 @@ export function fightSetup(options: FightOptions): CombatSetup {
     },
     enemies: enemySetups(encounter),
     deck: options.deck ?? WICK.deck,
+    compoundIds: COMPOUND_IDS,
   };
 }
 

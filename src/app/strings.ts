@@ -80,6 +80,14 @@ export const strings = {
       won: 'The act is closed. What is left of you is what you chose to keep.',
       lost: 'It was carried further than it could be carried.',
     },
+    overDeckHeading: 'Ended deck',
+    overMarksHeading: 'Marks acquired',
+    overSettled: (cards: string) => `Settled from ${cards}`,
+    overNoMarks: 'No Marks acquired.',
+    overNoSettled: 'No Settled card recorded.',
+    overCardCount: (name: string, count: number) => `${name} × ${String(count)}`,
+    overUnknownCard: (id: string) => `Unread card (${id})`,
+    overUnknownMark: (id: string) => `Unread Mark (${id})`,
     again: 'Again',
     walkedNodes: (n: number) => `${String(n)} nodes walked`,
   },
@@ -101,6 +109,8 @@ export const strings = {
     bleed: 'Bleed',
     draw: 'Draw',
     discard: 'Discard',
+    discardZero: 'Discard · 0 Weight',
+    discardCompound: (name: string) => `Discard ${name} at 0 Weight`,
     spent: 'Spent',
     marker: (name: string) => `${name}'s marker`,
     guardThrough: (n: number, beat: number) => `Guard ${String(n)}, gone after beat ${String(beat)}`,
@@ -108,6 +118,24 @@ export const strings = {
     reink: 'Re-inking',
     phase: (n: number) => `Phase ${String(n)}`,
     dead: 'Settled',
+    notaryPhase: (n: number) => `Phase ${String(n)}`,
+    reinkWindow: 'Re-ink window',
+    reinkIntent: (label: string) => `Re-ink window: ${label}`,
+    reinkTag: (multiplier: number, beats: number) => `Re-ink ×${String(multiplier)} · ${String(beats)} beats`,
+    reinkActive: (multiplier: number, beats: number) =>
+      `Re-ink active: damage ×${String(multiplier)} for ${String(beats)} more beat${beats === 1 ? '' : 's'}`,
+    reinkUntil: (beat: number) => `Vulnerability ends after beat ${String(beat)}.`,
+    reinkNext: (beat: number, beats: number, multiplier: number) =>
+      `Next re-ink: beat ${String(beat)} · ${String(beats)} beats · damage ×${String(multiplier)}.`,
+    reinkPattern: (beats: number, multiplier: number) =>
+      `Re-ink window: ${String(beats)} beats · damage ×${String(multiplier)}.`,
+    countersignCanceled: (lap: number | null, beat: number) =>
+      lap === null
+        ? `Countersign canceled on beat ${String(beat)}.`
+        : `Countersign canceled on lap ${String(lap)} (beat ${String(beat)}).`,
+    markStamped: (mark: string, lap: number) => `${mark} stamped on lap ${String(lap)}.`,
+    interestDue: (count: number, load: number) =>
+      `Interest due: ${String(count)} Compound${count === 1 ? '' : 's'} · Load ${String(load)}.`,
   },
   preview: {
     heading: 'If you play this',
@@ -150,6 +178,7 @@ export const strings = {
       ['← →', 'pick a body, while targeting'],
       ['Esc', 'back out'],
       ['W', 'wait a beat, draw a card'],
+      ['D', 'discard the selected Compound at 0 Weight'],
       ['F', 'hold to fast-forward'],
       ['S', 'the sheet: Marks, collateral, deck'],
       ['Enter', 'go on, once the fight is decided'],

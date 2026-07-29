@@ -18,11 +18,11 @@
  */
 import { create } from 'zustand';
 import { RUN_CONTENT } from '../content/library';
-import { isPlayerTurn, legalActions } from '../engine/combat';
+import { isPlayerTurn } from '../engine/combat';
 import { createRun, replayRun, runReduce, saveOf } from '../engine/run';
 import type { RunAction, RunState } from '../engine/runtypes';
 import type { Action, CombatState } from '../engine/types';
-import { playAction, needsTarget } from './combat/store';
+import { isLegalCombatAction, playAction, needsTarget } from './combat/store';
 import { platform } from '../platform';
 import { choicesFor, isIrreversible, type RunChoice } from './run/choices';
 
@@ -193,12 +193,7 @@ export const useApp = create<AppStore>()((set, get) => ({
   dispatch: (action) => {
     const combat = get().run?.combat ?? null;
     if (!combat || !isPlayerTurn(combat)) return;
-    const legal = legalActions(combat).some((option) => {
-      if (option.k !== action.k) return false;
-      if (option.k !== 'play_card' || action.k !== 'play_card') return true;
-      return option.uid === action.uid && (option.targetId ?? null) === (action.targetId ?? null);
-    });
-    if (!legal) return;
+    if (!isLegalCombatAction(combat, action)) return;
     get().dispatchRun({ k: 'combat', action });
   },
 

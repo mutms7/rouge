@@ -66,6 +66,15 @@ export type Passives = {
   readonly lapNthCard: readonly NthCardBoon[];
   readonly idleGuard: readonly { readonly beats: number; readonly n: number }[];
   readonly intentHorizon: number;
+  /** Phase-five economy and Compound hooks read in-combat. */
+  readonly cardLoad: number;
+  readonly interestCompounds: number;
+  readonly interestPeriod: number;
+  readonly firstCompoundBecomes: readonly string[];
+  readonly compoundPlayableAs: readonly Effect[];
+  readonly compoundDiscardFree: boolean;
+  readonly countersign: boolean;
+  readonly stampMarks: number;
 
   readonly onCombatStart: readonly KeyedEffects[];
   readonly onLapStart: readonly KeyedEffects[];
@@ -114,6 +123,14 @@ const EMPTY: Passives = {
   lapNthCard: [],
   idleGuard: [],
   intentHorizon: 0,
+  cardLoad: 0,
+  interestCompounds: 0,
+  interestPeriod: 0,
+  firstCompoundBecomes: [],
+  compoundPlayableAs: [],
+  compoundDiscardFree: false,
+  countersign: false,
+  stampMarks: 0,
   onCombatStart: [],
   onLapStart: [],
   onLapEnd: [],
@@ -153,6 +170,8 @@ export function collectMods(mods: readonly Mod[]): Passives {
   const p: Bucket = {
     ...EMPTY,
     attackDamagePer: [],
+    firstCompoundBecomes: [],
+    compoundPlayableAs: [],
     lapNthCard: [],
     idleGuard: [],
     onCombatStart: [],
@@ -250,6 +269,24 @@ export function collectMods(mods: readonly Mod[]): Passives {
       case 'intent_horizon':
         p.intentHorizon += mod.n;
         break;
+      case 'card_load':
+        p.cardLoad += mod.n;
+        break;
+      case 'interest_compounds':
+        p.interestCompounds += mod.n;
+        break;
+      case 'interest_period':
+        p.interestPeriod = Math.max(p.interestPeriod, mod.n);
+        break;
+      case 'first_compound_becomes':
+        p.firstCompoundBecomes.push(mod.cardId);
+        break;
+      case 'compound_playable_as':
+        p.compoundPlayableAs.push(...mod.effects);
+        break;
+      case 'compound_discard_free':
+        p.compoundDiscardFree = true;
+        break;
 
       case 'on_combat_start':
         p.onCombatStart.push({ key, effects: mod.effects });
@@ -301,15 +338,16 @@ export function collectMods(mods: readonly Mod[]): Passives {
       case 'phase_at_hp_pct':
         p.phaseAtHpPct.push(mod.pct);
         break;
+      case 'countersign':
+        p.countersign = true;
+        break;
+      case 'stamp_marks':
+        p.stampMarks += mod.n;
+        break;
 
       // Encoded for the layer above combat. `vocabulary.ts` says which phase collects
       // them; the Tally deliberately does nothing with them.
-      case 'countersign':
-      case 'stamp_marks':
       case 'mark_slots':
-      case 'card_load':
-      case 'interest_compounds':
-      case 'interest_period':
       case 'assay_discount_pct':
       case 'purchase_fails_one_in':
       case 'salt_per_win':
@@ -319,9 +357,6 @@ export function collectMods(mods: readonly Mod[]): Passives {
       case 'survive_lethal_run':
       case 'reveal_map_layer':
       case 'reveal_elite_intents':
-      case 'first_compound_becomes':
-      case 'compound_playable_as':
-      case 'compound_discard_free':
       case 'replicates':
       case 'irremovable':
       case 'compound_phase':

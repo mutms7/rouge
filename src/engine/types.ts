@@ -410,10 +410,20 @@ export type CombatEvent =
   | { readonly k: 'salt'; readonly amount: number; readonly total: number }
   | { readonly k: 'salt_stolen'; readonly who: string; readonly amount: number }
   | { readonly k: 'compound'; readonly uid: string; readonly cardId: string; readonly to: string }
+  /** Interest's bill came due. `count` is after Cooked Books/Usury modifiers. */
+  | {
+      readonly k: 'interest';
+      readonly load: number;
+      readonly count: number;
+      readonly period: number;
+      readonly beat: number;
+    }
   | { readonly k: 'compound_removed'; readonly cardId: string }
   | { readonly k: 'boon'; readonly cards: number }
   | { readonly k: 'returned'; readonly uid: string; readonly cardId: string }
   | { readonly k: 'vulnerable'; readonly who: string; readonly until: number; readonly multiplier: number }
+  | { readonly k: 'countersign_cancelled'; readonly who: string; readonly lap: number }
+  | { readonly k: 'mark_stamped'; readonly who: string; readonly markId: string; readonly lap: number }
   | { readonly k: 'phase'; readonly who: string; readonly phase: number }
   /**
    * A once-only escape fired. `fromCard` separates Dead Man's Switch from the sheet.
@@ -500,10 +510,29 @@ export type CombatState = {
   readonly wards: readonly Ward[];
   /** Mods that have fired their once-per-combat or once-per-lap allowance. */
   readonly spent: readonly string[];
+  /**
+   * Deck Load and the independent Interest clock, exposed for the combat UI. Generated
+   * combat-local Compounds add their printed Load; purging one removes it again. Exhausting
+   * or discarding leaves Load unchanged because the card remains in the combat deck.
+   */
+  readonly deckLoad: number;
+  readonly interestPeriod: number;
+  readonly interestNextBeat: number;
+  readonly interestLoad: number;
+  /** Current lap whose countersign has been cancelled by a re-ink hit, if any. */
+  readonly countersignCancelledLap: number | null;
+  /** Marks disabled by the Notary during this combat. */
+  readonly activeMarkIds: readonly string[];
+  readonly stampedMarks: readonly string[];
+  readonly markMods: Readonly<Record<string, readonly Mod[]>>;
+  readonly basePlayerMods: readonly Mod[];
+  readonly compoundIds: readonly string[];
 };
 
 export type Action =
   | { readonly k: 'play_card'; readonly uid: string; readonly targetId?: string }
+  /** Familiar: discard a held Compound without spending Weight or a beat. */
+  | { readonly k: 'discard_compound'; readonly uid: string }
   /** Advance your marker without playing anything. Still draws. */
   | { readonly k: 'wait' };
 
@@ -515,6 +544,9 @@ export type PlayerSetup = {
   /** Marks and Tokens, flattened. Empty in a combat with no run around it. */
   readonly mods?: readonly Mod[];
   readonly salt?: number;
+  /** Optional Mark identity/mod data, used by the Notary's phase-two stamping. */
+  readonly markIds?: readonly string[];
+  readonly markMods?: Readonly<Record<string, readonly Mod[]>>;
 };
 
 export type EnemySetup = {
@@ -541,6 +573,12 @@ export type CombatSetup = {
   readonly deck: readonly string[];
   readonly handCap?: number;
   readonly startingHand?: number;
+  /** Optional phase-five economy inputs; omitted callers retain the phase-one defaults. */
+  readonly deckLoad?: number;
+  readonly interestPeriod?: number;
+  readonly interestCompounds?: number;
+  /** Explicit Compound pool for generated cards; defaults to all unplayable cards. */
+  readonly compoundIds?: readonly string[];
 };
 
 /** One future enemy action, pinned to the beat it fires on. */

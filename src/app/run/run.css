@@ -341,6 +341,80 @@
   overflow-y: auto;
 }
 
+.sheet__panel--runover {
+  min-width: min(620px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.runover__section {
+  display: grid;
+  gap: var(--space);
+  border-top: 1px solid var(--rule);
+  padding-top: calc(var(--space) * 1.5);
+}
+
+.runover__heading {
+  margin: 0;
+  font-size: calc(16px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.runover__list,
+.runover__marks,
+.runover__settled {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.runover__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: calc(var(--space) * 0.5);
+}
+
+.runover__item,
+.runover__mark {
+  border: 1px solid color-mix(in srgb, var(--chalk) 60%, transparent);
+  padding: calc(var(--space) * 0.75);
+}
+
+.runover__item,
+.runover__settled,
+.runover__empty {
+  font-family: var(--font-mono);
+  font-size: calc(11px * var(--font-scale));
+  color: var(--ink);
+}
+
+.runover__marks {
+  display: grid;
+  gap: var(--space);
+}
+
+.runover__mark {
+  display: grid;
+  gap: calc(var(--space) * 0.5);
+}
+
+.runover__markName {
+  font-family: var(--font-display);
+  font-size: calc(15px * var(--font-scale));
+  color: var(--ink-strong);
+}
+
+.runover__settled {
+  display: grid;
+  gap: calc(var(--space) * 0.25);
+  padding-left: calc(var(--space) * 1.5);
+}
+
+.runover__settled--empty {
+  padding-left: 0;
+  color: var(--ink-quiet);
+}
+
 .roster__heading {
   display: flex;
   align-items: baseline;

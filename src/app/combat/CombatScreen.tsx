@@ -26,15 +26,47 @@ import { logLines, namingFor } from './feed';
 import { Hand, Readout, Record, type HandCard } from './Hand';
 import { Help } from './Help';
 import { intentForKey, isFastForwardKey, moveCursor } from './keys';
+import { notaryStatus } from './notary';
 import { Outcome } from './Outcome';
 import { previewAction } from './preview';
-import { actorOf, needsTarget, playAction, targetableEnemies } from './store';
+import { actorOf, legalCardActions, needsTarget, playAction, targetableEnemies } from './store';
 import { Tally } from './Tally';
 import { trackView } from './track';
 import { useFlashes } from './useFlashes';
 
 /** How much of the record the panel keeps on screen. Older lines are still in state. */
 const RECORD_LINES = 60;
+
+function NotaryCallout({ state, view }: { readonly state: CombatState; readonly view: ReturnType<typeof trackView> }) {
+  const status = notaryStatus(state);
+  if (!status) return null;
+  const next = view.lanes
+    .find((lane) => lane.id === status.id)
+    ?.intents.find((intent) => intent.reink && intent.beat >= state.beat);
+
+  return (
+    <aside className="combat__notary" data-active={status.active || undefined} role="status" aria-live="polite">
+      <span className="combat__notaryPhase">{strings.combat.notaryPhase(status.phase)}</span>
+      <strong className="combat__notaryTitle">
+        {status.active
+          ? strings.combat.reinkActive(status.window.multiplier, status.remaining)
+          : strings.combat.reinkWindow}
+      </strong>
+      <span className="combat__notaryDetail">
+        {status.active
+          ? strings.combat.reinkUntil(status.until)
+          : next
+            ? strings.combat.reinkNext(next.beat, status.window.beats, status.window.multiplier)
+            : strings.combat.reinkPattern(status.window.beats, status.window.multiplier)}
+      </span>
+      {status.countersignCanceled === null ? null : (
+        <span className="combat__notaryCanceled">
+          {strings.combat.countersignCanceled(status.countersignCanceled.lap, status.countersignCanceled.beat)}
+        </span>
+      )}
+    </aside>
+  );
+}
 
 /** The action a card commits to, with a body attached when the card needs one. */
 function actionFor(state: CombatState, uid: string, targetIndex: number): Action {
@@ -93,6 +125,15 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
     [store, targetIndex],
   );
 
+  const discard = useCallback(
+    (uid: string) => {
+      const current = store().run?.combat ?? null;
+      if (!current || !isPlayerTurn(current)) return;
+      store().dispatch({ k: 'discard_compound', uid });
+    },
+    [store],
+  );
+
   // One listener for the whole screen. `keys.ts` owns the mapping; this owns the wiring.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -131,6 +172,11 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
           if (uid) commit(uid);
           break;
         }
+        case 'discard': {
+          const uid = current.targeting?.uid ?? live?.deck.hand[current.cursor]?.uid;
+          if (uid) discard(uid);
+          break;
+        }
         case 'cancel':
           current.cancel();
           break;
@@ -165,7 +211,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [store, commit]);
+  }, [store, commit, discard]);
 
   const naming = namingFor(state);
   const view = trackView(state, actorOf(state)?.id ?? null);
@@ -173,7 +219,10 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
   const encounter = encounterOf(encounterId);
 
   const cards: HandCard[] = hand.flatMap((instance) => {
-    const face = faceOf(state, instance.cardId);
+    const actions = legalCardActions(state, instance.uid);
+    const canPlay = actions.play.length > 0;
+    const canDiscard = actions.discard !== null;
+    const face = faceOf(state, instance.cardId, canPlay);
     if (!face) return [];
     return [
       {
@@ -181,6 +230,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
         face,
         weight: effectiveWeight(state, instance.uid) ?? cardWeight(face.def, instance),
         printedWeight: cardWeight(face.def, instance),
+        discardable: canDiscard,
       },
     ];
   });
@@ -214,6 +264,8 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
           {strings.combat.lap(view.lap)} · {strings.combat.beat} {state.beat}
         </span>
       </header>
+
+      <NotaryCallout state={state} view={view} />
 
       <EnemyBoard
         state={state}
@@ -252,6 +304,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
         interactive={interactive}
         onHover={(uid) => { store().setHovered(uid); }}
         onActivate={commit}
+        onDiscard={discard}
       />
 
       {onward === null ? null : (
