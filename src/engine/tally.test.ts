@@ -1,24 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BEATS_PER_LAP } from './constants';
-import { dummyCombat, pileOf, tickEnemy } from './dummies';
+import { dummyCombat, marker, pileOf, tickEnemy } from './dummies';
 import { cardWeight, frontBeat, lapOf, nextActor, projectIntents, trackBeat } from './tally';
-import type { Combatant } from './types';
-
-function marker(id: string, team: Combatant['team'], position: number, hp = 10): Combatant {
-  return {
-    id,
-    name: id,
-    team,
-    hp,
-    maxHp: 10,
-    guard: 0,
-    guardFrozenUntil: 0,
-    position,
-    bleed: 0,
-    intentIndex: 0,
-    intents: [],
-  };
-}
 
 describe('the track', () => {
   it('splits absolute beats into laps of 24', () => {
@@ -54,11 +37,11 @@ describe('the track', () => {
   });
 
   it('ignores the dead', () => {
-    const board = [marker('p', 'player', 9), marker('a', 'enemy', 1, 0)];
+    const board = [marker('p', 'player', 9), marker('a', 'enemy', 1, { hp: 0 })];
     expect(frontBeat(board)).toBe(9);
     expect(nextActor(board)?.id).toBe('p');
-    expect(frontBeat([marker('a', 'enemy', 1, 0)])).toBeNull();
-    expect(nextActor([marker('a', 'enemy', 1, 0)])).toBeNull();
+    expect(frontBeat([marker('a', 'enemy', 1, { hp: 0 })])).toBeNull();
+    expect(nextActor([marker('a', 'enemy', 1, { hp: 0 })])).toBeNull();
   });
 
   it('costs an echo copy one more beat, and never less than zero', () => {

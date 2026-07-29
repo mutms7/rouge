@@ -4,6 +4,9 @@
  * The hand persists for the whole fight and there is no end-of-turn discard, so the
  * only pressure on it is the cap. You draw one per action, which means acting cheaply
  * is also how you find cards, and a Weight 5 nuke costs you tempo *and* cards.
+ *
+ * Nothing in here fires a trigger. `effects.ts` wraps the draw when a card needs to bite
+ * on the way into hand, which keeps the dependency arrow pointing one way.
  */
 import { emit } from './draft';
 import type { Draft } from './draft';
@@ -35,18 +38,23 @@ function reshuffleDiscard(draft: Draft): boolean {
 }
 
 /**
- * Draw up to n cards. Stops early on a full hand or an empty deck, rather than
- * throwing: running out of cards is a legitimate late-fight state, not an error.
+ * Draw up to n cards, and report which ones arrived.
+ *
+ * Stops early on a full hand or an empty deck, rather than throwing: running out of
+ * cards is a legitimate late-fight state, not an error.
  */
-export function drawCards(draft: Draft, n: number): void {
+export function drawCards(draft: Draft, n: number): CardInstance[] {
+  const drawn: CardInstance[] = [];
   for (let i = 0; i < n; i += 1) {
-    if (handIsFull(draft)) return;
-    if (draft.deck.draw.length === 0 && !reshuffleDiscard(draft)) return;
+    if (handIsFull(draft)) return drawn;
+    if (draft.deck.draw.length === 0 && !reshuffleDiscard(draft)) return drawn;
     const card = draft.deck.draw.shift();
-    if (!card) return;
+    if (!card) return drawn;
     draft.deck.hand.push(card);
+    drawn.push(card);
     emit(draft, { k: 'draw', uid: card.uid, cardId: card.cardId });
   }
+  return drawn;
 }
 
 export function discardCard(draft: Draft, instance: CardInstance): void {
@@ -65,9 +73,14 @@ export function exhaustCard(draft: Draft, instance: CardInstance): void {
   draft.runLog.push({ k: 'card_exhausted', cardId: instance.cardId, beat: draft.beat });
 }
 
-export function removeFromHand(draft: Draft, uid: string): CardInstance | null {
-  const index = draft.deck.hand.findIndex((c) => c.uid === uid);
+/** Pull an instance out of whichever pile it is in, by uid. */
+export function removeFrom(zone: CardInstance[], uid: string): CardInstance | null {
+  const index = zone.findIndex((c) => c.uid === uid);
   if (index < 0) return null;
-  const [removed] = draft.deck.hand.splice(index, 1);
+  const [removed] = zone.splice(index, 1);
   return removed ?? null;
+}
+
+export function removeFromHand(draft: Draft, uid: string): CardInstance | null {
+  return removeFrom(draft.deck.hand, uid);
 }

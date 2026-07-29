@@ -7,7 +7,7 @@
  * because a keyword test should not break when a card gets renumbered.
  */
 import { createCombat, reduce } from './combat';
-import type { CardDef, CombatEvent, CombatState, Combatant, EnemySetup, IntentDef } from './types';
+import type { CardDef, CombatEvent, CombatState, Combatant, Effect, EnemySetup, IntentDef, Mod } from './types';
 
 function card(def: CardDef): CardDef {
   return def;
@@ -144,6 +144,42 @@ export const DUMMY_CARDS: Readonly<Record<string, CardDef>> = {
   }),
 };
 
+/**
+ * A bare marker on the track, for the tests that are only about arithmetic.
+ *
+ * Lives here rather than in a test file so that adding a field to `Combatant` is one edit
+ * instead of one per test that happens to need a body.
+ */
+export function marker(
+  id: string,
+  team: Combatant['team'],
+  position: number,
+  overrides: Partial<Combatant> = {},
+): Combatant {
+  return {
+    id,
+    name: id,
+    team,
+    hp: 10,
+    maxHp: 10,
+    guard: 0,
+    guardFrozenUntil: 0,
+    position,
+    bleed: 0,
+    intentIndex: 0,
+    intents: [],
+    mods: [],
+    phase: 1,
+    phases: [],
+    vulnerableUntil: 0,
+    vulnerableMultiplier: 1,
+    damageBonus: 0,
+    damageScale: 1,
+    saltHoard: 0,
+    ...overrides,
+  };
+}
+
 /** An enemy that keeps a cadence and does nothing, for isolating track arithmetic. */
 export function tickEnemy(cadence: number, overrides: Partial<EnemySetup> = {}): EnemySetup {
   const intents: IntentDef[] = [{ id: 'tick', weight: cadence, targeting: 'none', effects: [] }];
@@ -169,20 +205,40 @@ export type DummyOptions = {
   readonly deck: readonly string[];
   readonly enemies?: readonly EnemySetup[];
   readonly playerHp?: number;
+  readonly playerMaxHp?: number;
   readonly handCap?: number;
   readonly startingHand?: number;
+  /** Extra definitions for the combat's library, for one-off atoms. Merged over the dummies. */
+  readonly cards?: Readonly<Record<string, CardDef>>;
+  /** Marks and Tokens, already flattened. The engine cannot tell the difference. */
+  readonly mods?: readonly Mod[];
+  readonly salt?: number;
 };
 
 export function dummyCombat(options: DummyOptions): CombatState {
   return createCombat({
     seed: options.seed ?? 1,
-    library: DUMMY_CARDS,
-    player: { hp: options.playerHp ?? 68 },
+    library: options.cards ? { ...DUMMY_CARDS, ...options.cards } : DUMMY_CARDS,
+    player: {
+      hp: options.playerHp ?? 68,
+      ...(options.playerMaxHp === undefined ? {} : { maxHp: options.playerMaxHp }),
+      ...(options.mods ? { mods: options.mods } : {}),
+      ...(options.salt === undefined ? {} : { salt: options.salt }),
+    },
     enemies: options.enemies ?? [tickEnemy(3)],
     deck: options.deck,
     handCap: options.handCap ?? 20,
     startingHand: options.startingHand ?? options.deck.length,
   });
+}
+
+/**
+ * A one-off card definition for a test.
+ *
+ * Weight 1 skill by default, so a test about an atom only has to say what the atom is.
+ */
+export function testCard(id: string, effects: readonly Effect[], overrides: Partial<CardDef> = {}): CardDef {
+  return { id, name: id, weight: 1, type: 'skill', targeting: 'none', effects, ...overrides };
 }
 
 /** The uid of the first copy of a card sitting in hand. Throws, so tests fail loudly. */

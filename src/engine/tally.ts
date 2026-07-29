@@ -94,3 +94,38 @@ export function projectIntents(
   out.sort((a, b) => a.beat - b.beat || a.enemyId.localeCompare(b.enemyId) || a.index - b.index);
   return out;
 }
+
+/**
+ * What the player is actually allowed to see, given the horizon and whatever they read.
+ *
+ * Two different things buy visibility and they buy it in different units. Tell and the
+ * Salt-Rimed Spectacles push the horizon out by a whole lap, which is a distance. Cold
+ * Read buys "the enemy's next 2 intents", which is a count and does not care how far
+ * away they are. So: project generously, then take the union of both allowances.
+ */
+export function visibleIntents(state: {
+  readonly beat: number;
+  readonly combatants: readonly Combatant[];
+  readonly intentHorizon: number;
+  readonly intentsRevealed: number;
+}): ProjectedIntent[] {
+  const horizon = Math.max(state.intentHorizon, BEATS_PER_LAP);
+  const generous = projectIntents(state, horizon + BEATS_PER_LAP * 2);
+  const withinHorizon = generous.filter((p) => p.beat < state.beat + horizon);
+  if (state.intentsRevealed <= 0) return withinHorizon;
+
+  // Count the extra reveals per enemy, so reading one body does not spend the allowance
+  // on a different one.
+  const extra: ProjectedIntent[] = [];
+  const seen = new Map<string, number>();
+  for (const projected of generous) {
+    if (withinHorizon.includes(projected)) continue;
+    const used = seen.get(projected.enemyId) ?? 0;
+    if (used >= state.intentsRevealed) continue;
+    seen.set(projected.enemyId, used + 1);
+    extra.push(projected);
+  }
+  return [...withinHorizon, ...extra].sort(
+    (a, b) => a.beat - b.beat || a.enemyId.localeCompare(b.enemyId) || a.index - b.index,
+  );
+}
