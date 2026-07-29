@@ -21,18 +21,31 @@ export type PaletteName = keyof typeof PALETTE;
 
 export const PALETTE_NAMES = Object.keys(PALETTE) as readonly PaletteName[];
 
-/** Card suits. Compound is not a draftable suit, it is what Interest makes. */
-export const SUITS = ['lie', 'grief', 'oath', 'theft', 'hunger', 'compound'] as const;
+/**
+ * Card suits.
+ *
+ * Compound is not a draftable suit, it is what Interest makes. Hunger belongs to Small
+ * Mercy and nothing in the demo uses it. Neutral is the eight cards in §9 that belong to
+ * nobody.
+ */
+export const SUITS = ['lie', 'grief', 'oath', 'theft', 'hunger', 'neutral', 'compound'] as const;
 
 export type Suit = (typeof SUITS)[number];
 
-/** Suit colours for placeholder tinting and card framing. Art contract §4. */
+/**
+ * Suit colours for placeholder tinting and card framing. Art contract §4.
+ *
+ * The contract names five suits and Compound, and is silent on neutral. With seven locked
+ * colours and every one of them already spoken for, neutral gets paper on paper: an
+ * untinted card, which reads correctly as "this belongs to nobody".
+ */
 export const SUIT_TINT: Record<Suit, PaletteName> = {
   lie: 'chalk',
   grief: 'brine',
   oath: 'slate',
   theft: 'brass',
   hunger: 'oxblood',
+  neutral: 'paper',
   compound: 'oxblood',
 };
 
@@ -43,6 +56,7 @@ export const SUIT_BASE: Record<Suit, PaletteName> = {
   oath: 'paper',
   theft: 'paper',
   hunger: 'paper',
+  neutral: 'paper',
   compound: 'void',
 };
 

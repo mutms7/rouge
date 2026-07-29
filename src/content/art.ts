@@ -9,6 +9,10 @@
  * Art is addressed by content ID. There is no registry and no wiring: a file at
  * `public/art/<kind>/<id>.png` shows up, its absence shows a placeholder.
  */
+import { CARD_LIST } from './cards';
+import { ENEMY_LIST } from './enemies';
+import { BRAND_ASSET_IDS, CHARACTERS, ICON_IDS, NODES, STORE_ASSET_IDS, STRATA } from './run';
+import { TOKEN_LIST } from './tokens';
 
 export const ART_KINDS = [
   'cards',
@@ -90,14 +94,41 @@ export function artAspectRatio(kind: ArtKind, id: string): number {
 /**
  * Every art ID the demo expects, derived from content.
  *
- * Empty in phase 0 on purpose: there is no content yet, so `art:check` correctly
- * reports zero expected IDs. Phase 2 encodes the cards, enemies, tokens and the
- * rest, and this reads off them. Nothing else changes.
+ * This is the shared to-do list with the art side, and it is *derived* rather than
+ * written down twice on purpose: adding a card to `cards.ts` adds a line to
+ * `npm run art:check` with no second edit, and there is no way for the two lists to
+ * drift apart. 129 files for the demo, per art contract §5.
+ *
+ * Bosses are the one exception to "one ID, one file": phases are separate images, so a
+ * boss contributes `<id>_p1` and `<id>_p2` to `bosses/` and nothing to `enemies/`.
  */
 export function expectedArtIds(): Record<ArtKind, string[]> {
-  const empty = {} as Record<ArtKind, string[]>;
-  for (const kind of ART_KINDS) empty[kind] = [];
-  return empty;
+  const ids = {} as Record<ArtKind, string[]>;
+  for (const kind of ART_KINDS) ids[kind] = [];
+
+  for (const card of CARD_LIST) ids.cards.push(card.id);
+
+  for (const enemy of ENEMY_LIST) {
+    if (enemy.artKind === 'bosses') {
+      const phases = 1 + (enemy.phases?.length ?? 0);
+      for (let phase = 1; phase <= phases; phase += 1) ids.bosses.push(`${enemy.id}_p${String(phase)}`);
+    } else {
+      ids.enemies.push(enemy.id);
+    }
+  }
+
+  for (const token of TOKEN_LIST) ids.tokens.push(token.id);
+  for (const node of NODES) ids.nodes.push(node.id);
+  for (const icon of ICON_IDS) ids.icons.push(icon);
+  for (const asset of STORE_ASSET_IDS) ids.store.push(asset);
+  for (const asset of BRAND_ASSET_IDS) ids.brand.push(asset);
+
+  for (const stratum of STRATA) ids.backdrops.push(...stratum.backdrops);
+  for (const character of CHARACTERS) {
+    for (const expression of character.expressions) ids.portraits.push(`${character.id}_${expression}`);
+  }
+
+  return ids;
 }
 
 /** Weight budget from art contract §7, in bytes. */

@@ -50,9 +50,18 @@ describe('art spec', () => {
     expect(isArtKind('sprites')).toBe(false);
   });
 
-  it('expects no art IDs until content exists', () => {
+  it('derives every expected ID from content, with no duplicates and a bucket per kind', () => {
     const expected = expectedArtIds();
     expect(Object.keys(expected).sort()).toEqual([...ART_KINDS].sort());
-    expect(ART_KINDS.flatMap((kind) => expected[kind])).toEqual([]);
+
+    const all = ART_KINDS.flatMap((kind) => expected[kind]);
+    // Derived rather than written down twice: adding a card adds a line to `art:check`
+    // with no second edit, so the two lists cannot drift apart. The exact counts are
+    // asserted in `content.test.ts`, next to the design doc numbers they come from.
+    expect(all.length).toBeGreaterThan(0);
+    for (const kind of ART_KINDS) {
+      expect(new Set(expected[kind]).size, `${kind} has duplicates`).toBe(expected[kind].length);
+      for (const id of expected[kind]) expect(ART_ID_PATTERN.test(id), `${kind}/${id}`).toBe(true);
+    }
   });
 });
