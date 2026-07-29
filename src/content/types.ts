@@ -8,8 +8,17 @@
  * The dependency arrow points inward. `content/` may import `engine/`; the reverse is a
  * lint error, because the engine defines the vocabulary and content fills it in.
  */
+import type { LayerSpec, NodeKind, RunEffect } from '../engine/runtypes';
 import type { CardDef, Effect, IntentDef, Mod } from '../engine/types';
 import type { Suit } from './palette';
+
+/**
+ * The run-layer vocabulary belongs to the engine, same as `Effect` does.
+ *
+ * Re-exported rather than redeclared, because a Hollow's outcomes are resolved by
+ * `engine/run.ts` and two copies of that union would drift the first time one grew a case.
+ */
+export type { LayerSpec, NodeKind, RunEffect };
 
 export type Rarity = 'starter' | 'common' | 'uncommon' | 'rare' | 'neutral' | 'compound';
 
@@ -90,32 +99,6 @@ export type EncounterDef = {
   readonly members: readonly EncounterMember[];
 };
 
-/**
- * What a Hollow can do to you. The run layer's vocabulary, separate from `Effect`.
- *
- * An `Effect` happens inside a combat and knows about beats. These happen between fights
- * and know about decks, Salt and the map. Keeping them apart means neither union has to
- * carry cases the other one can never resolve.
- */
-export type RunEffect =
-  | { readonly k: 'gain_card'; readonly n: number; readonly pool: 'any' | 'rare' }
-  | { readonly k: 'remove_card'; readonly n: number; readonly destroysMark?: boolean }
-  | { readonly k: 'upgrade_card'; readonly n: number }
-  | { readonly k: 'add_card_load'; readonly n: number }
-  | { readonly k: 'gain_token'; readonly n: number }
-  | { readonly k: 'gain_salt'; readonly n: number }
-  | { readonly k: 'spend_salt'; readonly n: number }
-  | { readonly k: 'gain_mark_slot'; readonly n: number }
-  | { readonly k: 'lose_hp'; readonly n: number }
-  | { readonly k: 'lose_max_hp'; readonly n: number }
-  | { readonly k: 'heal'; readonly n: number }
-  | { readonly k: 'add_compound'; readonly n: number }
-  | { readonly k: 'reveal_nodes'; readonly n: number }
-  | { readonly k: 'reveal_boss_intent' }
-  /** A Door That Has Been Opened Before. Act 4 collects on this. */
-  | { readonly k: 'compound_phase'; readonly n: number }
-  | { readonly k: 'nothing' };
-
 export type RunEffectKind = RunEffect['k'];
 
 export type HollowOption = {
@@ -139,8 +122,6 @@ export type HollowDef = {
 };
 
 /** §5.1. The symbol carries the meaning alongside the icon, never colour alone. */
-export type NodeKind = 'debtor' | 'collector' | 'assay' | 'reckoning' | 'wake' | 'hollow' | 'vault' | 'boss';
-
 export type NodeDef = {
   readonly id: NodeKind;
   readonly name: string;
@@ -155,6 +136,13 @@ export type StratumDef = {
   readonly bossEncounterId: string;
   /** `art/backdrops/<id>.png`. The last one is the boss room. */
   readonly backdrops: readonly string[];
+  /**
+   * One entry per layer of the map, in order. `layers.length` is `nodes`.
+   *
+   * The shape of an act is content, not code: the generator in `engine/map.ts` reads this
+   * and knows nothing about which act it is building.
+   */
+  readonly layers: readonly LayerSpec[];
 };
 
 export type CharacterDef = {

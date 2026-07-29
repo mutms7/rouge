@@ -6,7 +6,8 @@
  * requirement rather than decoration: shape and text always carry the meaning too, so the
  * symbol lives in the data next to the name.
  */
-import type { CharacterDef, NodeDef, NodeKind, StratumDef } from './types';
+import type { RunEconomy } from '../engine/runtypes';
+import type { CharacterDef, LayerSpec, NodeDef, NodeKind, StratumDef } from './types';
 
 /** §5.1. Symbols are load-bearing: never encode information in colour alone. */
 export const NODES: readonly NodeDef[] = [
@@ -29,6 +30,36 @@ export function nodeOf(id: NodeKind): NodeDef {
 }
 
 /**
+ * Act 1's twelve layers, in order.
+ *
+ * A layer with one kind in it is that kind on every branch, which is how the act guarantees
+ * one Assay, one Reckoning and one Wake however you walk it: nobody should be able to miss
+ * Settling entirely and then wonder why the boss is impossible. A layer with several is a
+ * real fork, and repeating an entry weights it.
+ *
+ * Layer 0 is one node on purpose. Fight one is the Chalk Debtor and the beat grid has to
+ * explain itself against a single telegraphed attack, so there is nothing to choose yet.
+ * Layer 11 is the Notary.
+ *
+ * The shape is deliberately legible in four seconds, per §2: fight, fork, shop, fork,
+ * Reckoning, elite-or-fight, rest, fork, fork, elite, rest-or-shop, boss.
+ */
+const CHALK_WARDS_LAYERS: readonly LayerSpec[] = [
+  { width: [1, 1], kinds: ['debtor'] },
+  { width: [2, 2], kinds: ['debtor', 'hollow'] },
+  { width: [2, 2], kinds: ['assay'] },
+  { width: [2, 3], kinds: ['debtor', 'debtor', 'hollow'] },
+  { width: [2, 2], kinds: ['reckoning'] },
+  { width: [2, 2], kinds: ['debtor', 'collector'] },
+  { width: [2, 2], kinds: ['wake'] },
+  { width: [2, 3], kinds: ['debtor', 'vault', 'hollow'] },
+  { width: [2, 2], kinds: ['debtor', 'hollow'] },
+  { width: [1, 2], kinds: ['collector'] },
+  { width: [2, 2], kinds: ['wake', 'assay'] },
+  { width: [1, 1], kinds: ['boss'] },
+];
+
+/**
  * The Chalk Wards. Petty debts, dry and administrative. §5.2.
  *
  * Only Act 1 exists in the demo. Acts 2 to 4 are sketched in §14 and are explicitly out
@@ -41,6 +72,7 @@ export const STRATA: readonly StratumDef[] = [
     nodes: 12,
     bossEncounterId: 'the_notary',
     backdrops: ['chalk_wards_a', 'chalk_wards_b', 'chalk_wards_c', 'chalk_wards_boss'],
+    layers: CHALK_WARDS_LAYERS,
   },
 ];
 
@@ -147,3 +179,41 @@ export function compoundsPerLap(deckLoad: number): number {
 
 /** Mark slots run from 3 to 8. §4.3. */
 export const MARK_SLOTS = { start: 3, max: 8 } as const;
+
+/**
+ * Prices and payouts.
+ *
+ * The design doc fixes two of these and is silent on the rest: Wake sells a Mark slot for 60
+ * Salt (§5.1) and A Man Selling His Own Name sells one for 40 (§12). Everything else here is
+ * a first pass reverse-engineered from those two, on the theory that a full act should pay
+ * for roughly three purchases: about 190 Salt across twelve nodes, against a shop where the
+ * interesting things cost 60 to 110. Phase 6 is where the sim argues with all of it.
+ *
+ * Numbers, not code, so the argument is a diff in this table.
+ */
+export const ECONOMY: RunEconomy = {
+  saltPerDebtor: 14,
+  saltPerCollector: 30,
+  saltPerVault: 40,
+  /** §5.1 says 30 percent. */
+  wakeHealPct: 30,
+  /** §5.1 says 60. */
+  wakeSlotSalt: 60,
+  assayCardSalt: { common: 40, uncommon: 60, rare: 95, neutral: 50, starter: 35 },
+  assayTokenSalt: 105,
+  assaySlotSalt: 85,
+  assayRemoveSalt: 55,
+  assayCards: 3,
+  assayTokens: 2,
+  rewardCards: 3,
+  /**
+   * Draft weighting. Starters are never offered: they are what you already have too many of,
+   * and a reward screen that can hand you a fourth Paper Cut is a reward screen you learn to
+   * skip.
+   */
+  draftWeights: { common: 52, uncommon: 30, rare: 8, neutral: 10 },
+  /** Ten cards in, so five is already a thin deck and four is a broken one. */
+  minDeckSize: 5,
+  /** Paying in paper: one card covers this much Salt, rounded up, minimum one card. */
+  saltPerCardPaid: 60,
+};

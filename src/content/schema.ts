@@ -24,7 +24,7 @@ import { ENCOUNTERS, ENEMY_LIST } from './enemies';
 import { HOLLOW_LIST } from './hollows';
 import { MARKS } from './marks';
 import { cardText, wordCount } from './rules-text';
-import { BRAND_ASSET_IDS, ICON_IDS, NODES, STORE_ASSET_IDS, STRATA, WICK } from './run';
+import { BRAND_ASSET_IDS, ICON_IDS, NODES, NODE_IDS, STORE_ASSET_IDS, STRATA, WICK } from './run';
 import { TOKEN_LIST } from './tokens';
 import { effectsDeep, modEffects } from './types';
 
@@ -282,6 +282,35 @@ export function validateContent(): Problem[] {
     checkIds(problems, where, stratum.backdrops);
     if (!ENCOUNTERS.some((e) => e.id === stratum.bossEncounterId)) {
       problems.push({ where, message: `boss encounter "${stratum.bossEncounterId}" does not exist` });
+    }
+
+    /*
+     * The map layout, which types cannot check.
+     *
+     * A layer with no kinds, a width of zero, or a boss anywhere but the last row are each a
+     * map the generator would happily build and nobody could finish. Cheap here, miserable to
+     * find at node nine with the seed already lost.
+     */
+    if (stratum.layers.length !== stratum.nodes) {
+      problems.push({
+        where,
+        message: `${String(stratum.layers.length)} layers for ${String(stratum.nodes)} nodes: one layer is one step`,
+      });
+    }
+    for (const [index, layer] of stratum.layers.entries()) {
+      const at = `${where}/layer${String(index)}`;
+      const [min, max] = layer.width;
+      if (min < 1 || max < min) problems.push({ where: at, message: `width ${String(min)}..${String(max)} is not a range` });
+      if (layer.kinds.length === 0) problems.push({ where: at, message: 'no node kinds: nothing to put on the row' });
+      for (const kind of layer.kinds) {
+        if (!NODE_IDS.includes(kind)) problems.push({ where: at, message: `unknown node kind "${kind}"` });
+      }
+      const last = index === stratum.layers.length - 1;
+      const boss = layer.kinds.includes('boss');
+      if (last && !(boss && layer.kinds.length === 1 && max === 1)) {
+        problems.push({ where: at, message: 'the last layer is exactly one boss node' });
+      }
+      if (!last && boss) problems.push({ where: at, message: 'a boss in the middle of the act' });
     }
   }
 
