@@ -507,6 +507,24 @@ function soonestBeat(items: readonly { readonly at: number }[]): number | null {
   return soonest;
 }
 
+/**
+ * Threefold: a sworn thing lands twice, at half value each.
+ *
+ * Halved on the way out rather than by scaling the whole payload, so a perjury that also
+ * draws a card draws two cards and deals its damage in two pieces. Rounded up, because two
+ * halves of 5 rounding down to 4 total would make the Mark a downgrade on odd numbers, and
+ * a Mark that quietly punishes you is worse than no Mark.
+ */
+function halveEffects(effects: readonly Effect[]): Effect[] {
+  return effects.map((effect) => {
+    if (effect.k === 'damage' || effect.k === 'damage_random' || effect.k === 'self_damage') {
+      return { ...effect, n: Math.max(1, Math.ceil(effect.n / 2)) };
+    }
+    if (effect.k === 'guard' || effect.k === 'heal') return { ...effect, n: Math.max(1, Math.ceil(effect.n / 2)) };
+    return effect;
+  });
+}
+
 /** Resolve everything sworn for this beat or earlier. Returns true if anything fired. */
 function firePendingAt(draft: Draft, beat: number): boolean {
   const due = draft.pending.filter((p) => p.at <= beat);
@@ -517,16 +535,21 @@ function firePendingAt(draft: Draft, beat: number): boolean {
     const owner = byId(draft, pending.ownerId);
     if (!owner || !isAlive(owner)) continue;
     emit(draft, { k: 'perjury_resolved', cardId: pending.sourceCardId });
-    applyEffects(draft, pending.effects, {
-      actorId: owner.id,
-      targetIds: retarget(draft, owner, pending.targetId),
-      sourceId: pending.sourceCardId,
-      played: null,
-      flags: null,
-      isAttack: true,
-      viaPerjury: true,
-      isSecondHit: false,
-    });
+    const split = passivesOf(owner).perjurySplit;
+    const payload = split ? halveEffects(pending.effects) : pending.effects;
+    for (let hit = 0; hit < (split ? 2 : 1); hit += 1) {
+      if (!isAlive(owner)) break;
+      applyEffects(draft, payload, {
+        actorId: owner.id,
+        targetIds: retarget(draft, owner, pending.targetId),
+        sourceId: pending.sourceCardId,
+        played: null,
+        flags: null,
+        isAttack: true,
+        viaPerjury: true,
+        isSecondHit: hit > 0,
+      });
+    }
   }
   return true;
 }
@@ -621,6 +644,9 @@ function runLapEnd(draft: Draft, lap: number): void {
 
   const player = playerOf(draft);
   if (player) {
+    // Usury. Income on the lap clock, which is the only clock the run and the Tally share.
+    const income = passivesOf(player).saltPerLap;
+    if (income > 0) applyEffects(draft, [{ k: 'salt', n: income }], baseContext({ actorId: player.id, sourceId: 'usury' }));
     for (const trigger of handPassives(draft).inHandLapEnd) {
       applyEffects(draft, trigger.effects, baseContext({ actorId: player.id, sourceId: trigger.key }));
     }

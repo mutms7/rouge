@@ -54,6 +54,10 @@ export type Passives = {
   readonly lapDraw: number;
   readonly perjurySooner: number;
   readonly perjuryDamagePct: number;
+  /** Threefold: a sworn thing resolves twice, at half value each. */
+  readonly perjurySplit: boolean;
+  /** Usury. Lap income, so it belongs to the Tally even though the Salt outlives it. */
+  readonly saltPerLap: number;
   readonly enemiesStartSlipped: number;
   readonly guardNoDecayFirstLap: boolean;
   readonly lapFirstGuardFrozen: number;
@@ -100,6 +104,8 @@ const EMPTY: Passives = {
   lapDraw: 0,
   perjurySooner: 0,
   perjuryDamagePct: 0,
+  perjurySplit: false,
+  saltPerLap: 0,
   enemiesStartSlipped: 0,
   guardNoDecayFirstLap: false,
   lapFirstGuardFrozen: 0,
@@ -214,6 +220,12 @@ export function collectMods(mods: readonly Mod[]): Passives {
       case 'perjury_damage_pct':
         p.perjuryDamagePct += mod.n;
         break;
+      case 'perjury_split':
+        p.perjurySplit = true;
+        break;
+      case 'salt_per_lap':
+        p.saltPerLap += mod.n;
+        break;
       case 'enemies_start_slipped':
         p.enemiesStartSlipped += mod.n;
         break;
@@ -294,7 +306,6 @@ export function collectMods(mods: readonly Mod[]): Passives {
       // them; the Tally deliberately does nothing with them.
       case 'countersign':
       case 'stamp_marks':
-      case 'perjury_split':
       case 'mark_slots':
       case 'card_load':
       case 'interest_compounds':
@@ -302,7 +313,6 @@ export function collectMods(mods: readonly Mod[]): Passives {
       case 'assay_discount_pct':
       case 'purchase_fails_one_in':
       case 'salt_per_win':
-      case 'salt_per_lap':
       case 'on_settle':
       case 'on_combat_won':
       case 'on_collector_won':

@@ -18,7 +18,8 @@ import type { EffectKind, ModKind } from './types';
 
 /**
  * `combat` means the Tally resolves it. `run` means the layer above combat owns it, and
- * it is a no-op inside a fight by design, not by omission.
+ * it is a no-op inside a fight by design, not by omission. Phase 4 built that layer, so
+ * most of the `run` entries below are live now and `run.ts` is where they land.
  */
 export type Scope = 'combat' | 'run';
 
@@ -66,8 +67,8 @@ export const EFFECT_VOCAB: Readonly<Record<EffectKind, VocabEntry>> = {
   vulnerable: { scope: 'combat', live: true },
   steal_salt: { scope: 'combat', live: true },
   ally_damage: { scope: 'combat', live: true },
-  /** Lamp Oil looks at the map, which combat cannot see. */
-  reveal_nodes: { scope: 'run', live: false, owner: 'phase 4, the map' },
+  /** Lamp Oil looks at the map, which combat cannot see. Resolved by `run.ts`. */
+  reveal_nodes: { scope: 'run', live: true },
 };
 
 export const MOD_VOCAB: Readonly<Record<ModKind, VocabEntry>> = {
@@ -126,31 +127,32 @@ export const MOD_VOCAB: Readonly<Record<ModKind, VocabEntry>> = {
   countersign: { scope: 'combat', live: false, owner: 'phase 5, the Notary' },
   stamp_marks: { scope: 'combat', live: false, owner: 'phase 5, the Notary' },
 
-  // Threefold rewrites how a perjury resolves rather than scaling it, so it waits for
-  // the Marks to actually be grantable.
-  perjury_split: { scope: 'combat', live: false, owner: 'phase 4, Settling' },
+  // Threefold rewrites how a perjury resolves rather than scaling it, which is why it
+  // waited for the phase where a Mark can actually be granted.
+  perjury_split: { scope: 'combat', live: true },
 
-  // The run above combat.
-  mark_slots: { scope: 'run', live: false, owner: 'phase 4, Reckoning' },
+  // The run above combat. `salt_per_lap` is the odd one: income on the lap clock, so the
+  // Tally is what fires it even though the Salt outlives the fight.
+  mark_slots: { scope: 'run', live: true },
   card_load: { scope: 'run', live: false, owner: 'phase 5, Interest' },
   interest_compounds: { scope: 'run', live: false, owner: 'phase 5, Interest' },
   interest_period: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  assay_discount_pct: { scope: 'run', live: false, owner: 'phase 4, the Assay' },
-  purchase_fails_one_in: { scope: 'run', live: false, owner: 'phase 4, the Assay' },
-  salt_per_win: { scope: 'run', live: false, owner: 'phase 4, the run' },
-  salt_per_lap: { scope: 'run', live: false, owner: 'phase 4, the run' },
-  on_settle: { scope: 'run', live: false, owner: 'phase 4, Reckoning' },
-  on_combat_won: { scope: 'run', live: false, owner: 'phase 4, the run' },
-  on_collector_won: { scope: 'run', live: false, owner: 'phase 4, the run' },
-  survive_lethal_run: { scope: 'run', live: false, owner: 'phase 4, the run' },
-  reveal_map_layer: { scope: 'run', live: false, owner: 'phase 4, the map' },
-  reveal_elite_intents: { scope: 'run', live: false, owner: 'phase 4, the map' },
+  assay_discount_pct: { scope: 'run', live: true },
+  purchase_fails_one_in: { scope: 'run', live: true },
+  salt_per_win: { scope: 'run', live: true },
+  salt_per_lap: { scope: 'combat', live: true },
+  on_settle: { scope: 'run', live: true },
+  on_combat_won: { scope: 'run', live: true },
+  on_collector_won: { scope: 'run', live: true },
+  survive_lethal_run: { scope: 'run', live: true },
+  reveal_map_layer: { scope: 'run', live: true },
+  reveal_elite_intents: { scope: 'run', live: false, owner: 'phase 5, the boss intent panel' },
   first_compound_becomes: { scope: 'run', live: false, owner: 'phase 5, Interest' },
   compound_playable_as: { scope: 'run', live: false, owner: 'phase 5, Interest' },
   compound_discard_free: { scope: 'run', live: false, owner: 'phase 5, Interest' },
   replicates: { scope: 'run', live: false, owner: 'phase 5, Interest' },
-  irremovable: { scope: 'run', live: false, owner: 'phase 4, Reckoning' },
-  compound_phase: { scope: 'run', live: false, owner: 'milestone E, the Inversion' },
+  irremovable: { scope: 'run', live: true },
+  compound_phase: { scope: 'run', live: true },
 };
 
 export const EFFECT_KINDS = Object.keys(EFFECT_VOCAB) as readonly EffectKind[];

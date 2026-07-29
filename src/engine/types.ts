@@ -254,6 +254,13 @@ export type WeightScale = {
 
 export type CardDef = {
   readonly id: string;
+  /**
+   * The card this one was derived from, for upgrades and Ink Well variants.
+   *
+   * Absent on everything in `content/cards.ts`. Present means "the art, the suit and the
+   * Mark are filed under `baseId`, the numbers are mine". See `engine/variants.ts`.
+   */
+  readonly baseId?: string;
   readonly name: string;
   /** Beats your marker advances when you play it. The entire cost system. §3.2. */
   readonly weight: number;
@@ -408,7 +415,14 @@ export type CombatEvent =
   | { readonly k: 'returned'; readonly uid: string; readonly cardId: string }
   | { readonly k: 'vulnerable'; readonly who: string; readonly until: number; readonly multiplier: number }
   | { readonly k: 'phase'; readonly who: string; readonly phase: number }
-  | { readonly k: 'ward_spent'; readonly who: string; readonly healed: number }
+  /**
+   * A once-only escape fired. `fromCard` separates Dead Man's Switch from the sheet.
+   *
+   * The run needs to know which, because the once-per-*run* ward is armed as an ordinary
+   * combat ward and the run has to find out whether it went off. A card burning its own
+   * ward must not spend the one printed on your character sheet.
+   */
+  | { readonly k: 'ward_spent'; readonly who: string; readonly healed: number; readonly fromCard: boolean }
   | { readonly k: 'death'; readonly who: string };
 
 /** The combat log. Append-only. Phase 3's animation layer diffs off this. */

@@ -253,7 +253,8 @@ function spendWard(draft: Draft, target: DraftCombatant): boolean {
   if (!ward || target.team !== 'player') return false;
   draft.wards.splice(index, 1);
   target.hp = Math.min(target.maxHp, ward.heal);
-  emit(draft, { k: 'ward_spent', who: target.id, healed: target.hp });
+  // A ward with a card behind it is Dead Man's Switch; one with none came off the sheet.
+  emit(draft, { k: 'ward_spent', who: target.id, healed: target.hp, fromCard: ward.cardUid !== null });
   if (ward.cardUid) {
     const instance = removeFrom(draft.deck.discard, ward.cardUid) ?? removeFrom(draft.deck.hand, ward.cardUid);
     if (instance) exhaustCard(draft, instance);
