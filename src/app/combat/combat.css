@@ -411,6 +411,62 @@
   background: var(--slate);
 }
 
+/*
+ * Guard cracking as it melts.
+ *
+ * Guard decays a point per beat (§3.3), which is arithmetic the bar already shows by getting
+ * shorter. What it does not show is that the shortening is *happening to you*, so the beat it
+ * shrinks on, the hatching lifts off the rule and the far end lightens: the shield is coming
+ * apart along its length rather than being politely trimmed.
+ *
+ * Shape carries it as well as colour, per the colourblind rule: the border thins and the
+ * texture opens up, both of which survive a greyscale screenshot.
+ */
+@keyframes guard-crack {
+  0% {
+    transform: translateY(0);
+    filter: none;
+  }
+  35% {
+    transform: translateY(-1px);
+    filter: contrast(0.6);
+  }
+  100% {
+    transform: translateY(0);
+    filter: none;
+  }
+}
+
+.tally__guard[data-decaying] {
+  animation: guard-crack 260ms ease-out;
+  border-bottom-width: 1px;
+  background: repeating-linear-gradient(135deg, var(--slate) 0 1px, transparent 1px 6px);
+}
+
+/*
+ * Guard breaking outright. Louder than the melt, because it is the difference between the
+ * shield thinning and the shield being gone with a swing still to come.
+ */
+@keyframes guard-gone {
+  0% {
+    opacity: 1;
+    letter-spacing: normal;
+  }
+  30% {
+    opacity: 0.35;
+    letter-spacing: 0.14em;
+  }
+  100% {
+    opacity: 1;
+    letter-spacing: normal;
+  }
+}
+
+.player[data-guard-broke] .stat:first-child .stat__value {
+  animation: guard-gone 340ms ease-out;
+  color: var(--debt);
+}
+
 /* --- markers -------------------------------------------------------------- */
 
 .marker {

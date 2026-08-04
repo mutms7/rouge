@@ -12,12 +12,13 @@
  * buffer and nothing waiting on a timer that the board depends on. The worst a dropped
  * animation can do is make the board correct sooner.
  */
+import { useAnimate } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { encounterOf } from '../../content/enemies';
 import { effectiveWeight, isPlayerTurn } from '../../engine/combat';
 import { cardWeight } from '../../engine/tally';
 import type { Action, CombatState } from '../../engine/types';
-import { useSettings } from '../settings';
+import { useDuration, useSettings, useSkipAnimation } from '../settings';
 import { useApp } from '../store';
 import { strings } from '../strings';
 import { EnemyBoard, PlayerPanel } from './Bodies';
@@ -33,6 +34,7 @@ import { actorOf, legalCardActions, needsTarget, playAction, targetableEnemies }
 import { Tally } from './Tally';
 import { trackView } from './track';
 import { useFlashes } from './useFlashes';
+import { shakeKeyframes, useImpact } from './useImpact';
 
 /** How much of the record the panel keeps on screen. Older lines are still in state. */
 const RECORD_LINES = 60;
@@ -92,6 +94,29 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
   const store = useApp.getState;
 
   const flashes = useFlashes();
+  const impact = useImpact();
+  const skip = useSkipAnimation();
+  // Long enough to feel like a blow, short enough that the next card is already playable.
+  const shakeSeconds = useDuration(0.09 + impact.shake * 0.17);
+
+  /*
+   * The shake, run imperatively.
+   *
+   * Declaratively is the obvious way and it is wrong here. A keyframe array on `animate` plays
+   * once and then sits there, so a second hit needs the element re-keyed to fire again, and
+   * re-keying this element would remount the whole board: the hand's `AnimatePresence` loses
+   * every card mid-flight and the Tally's markers jump. `useAnimate` restarts the same element
+   * instead, which is what a second punch actually is.
+   *
+   * `impact` is memoised per engine state, so this fires exactly once per exchange, and never
+   * at all when reduced motion or fast-forward is on.
+   */
+  const [scope, animate] = useAnimate();
+  useEffect(() => {
+    const frames = shakeKeyframes(impact.shake, skip);
+    if (!frames || !scope.current) return;
+    void animate(scope.current, frames, { duration: shakeSeconds, ease: 'easeOut' });
+  }, [impact, skip, shakeSeconds, animate, scope]);
 
   const interactive = onward === null && isPlayerTurn(state);
   const hand = state.deck.hand;
@@ -267,7 +292,10 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
   const previewCard = previewUid ? (cards.find((c) => c.uid === previewUid)?.face ?? null) : null;
 
   return (
-    <div className="combat">
+    // The shake is on the screen rather than on the body that got hit, because being hit is
+    // something that happens to *you*: the bodies have their own flinch in `Bodies.tsx`, and the
+    // room only moves when HP actually left.
+    <div className="combat" ref={scope}>
       {/* The seed, fast-forward and the legend live on the run's status bar, one level up. */}
       <header className="combat__bar">
         <span className="combat__title">{encounter.name}</span>
@@ -290,7 +318,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
         }}
       />
 
-      <Tally view={view} preview={preview} ghostPositions={ghosts} />
+      <Tally view={view} preview={preview} ghostPositions={ghosts} advance={impact.advance} />
 
       <div className="combat__middle">
         <PlayerPanel
@@ -298,6 +326,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
           flashes={flashes}
           guardAfter={preview?.guardAfter ?? null}
           hpAfter={preview?.hpAfter ?? null}
+          guardBroke={impact.guardBroke}
         />
         <Readout
           preview={preview}

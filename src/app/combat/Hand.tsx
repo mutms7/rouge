@@ -65,8 +65,11 @@ export function Hand({ cards, handCap, cursor, hovered, activeUid, interactive, 
             layout={false}
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24, scale: 0.9 }}
-            transition={{ duration, ease: 'easeOut' }}
+            // A played card goes *into* the board, not into a bin: up, over-scaled, and gone.
+            // The heavier the card the further and slower it travels, so Weight is legible in
+            // the gesture and not only in the number printed on the corner.
+            exit={{ opacity: 0, y: -22 - card.weight * 7, scale: 1.06 + card.weight * 0.03, rotate: card.weight }}
+            transition={{ duration: duration * (1 + card.weight * 0.12), ease: 'easeOut' }}
             onMouseEnter={() => {
               onHover(card.uid);
             }}

@@ -17,8 +17,10 @@
  * flagged: those are the actions you are handing over by playing that card.
  */
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { useDuration } from '../settings';
 import { strings } from '../strings';
+import { slideSeconds } from './feel';
 import type { PlayPreview } from './preview';
 import type { Chip } from './summary';
 import type { TrackIntent, TrackLane, TrackView } from './track';
@@ -28,6 +30,8 @@ export type TallyProps = {
   readonly preview: PlayPreview | null;
   /** Bodies whose marker the preview moves. Slip is invisible without this. */
   readonly ghostPositions: Readonly<Record<string, number>>;
+  /** Beats the clock just moved, so a heavy card lands like one. */
+  readonly advance: number;
 };
 
 function ChipBadge({ chip }: { readonly chip: Chip }) {
@@ -80,10 +84,22 @@ function GuardBar({ guard, duration, label }: {
   readonly duration: number;
   readonly label: string;
 }) {
+  // Guard melts a point a beat on its own, with no event to hang a cue on, so the only honest
+  // source for "it just shrank" is the value this bar was drawn at last time. Adjusted during
+  // render rather than in an effect, so the crack is on the same frame as the shorter bar
+  // instead of one behind it.
+  const [previous, setPrevious] = useState(guard.n);
+  const [decaying, setDecaying] = useState(false);
+  if (previous !== guard.n) {
+    setPrevious(guard.n);
+    setDecaying(guard.n < previous);
+  }
+
   return (
     <>
       <motion.div
         className="tally__guard"
+        data-decaying={decaying || undefined}
         initial={false}
         animate={{ scaleX: guard.through + 1 }}
         transition={{ duration, ease: 'easeOut' }}
@@ -146,8 +162,11 @@ function GhostMarker({ offset, duration, label }: {
   );
 }
 
-export function Tally({ view, preview, ghostPositions }: TallyProps) {
-  const duration = useDuration(0.32);
+export function Tally({ view, preview, ghostPositions, advance }: TallyProps) {
+  const base = useDuration(0.32);
+  // The strip and the markers carry the weight of the card that just resolved. The preview band
+  // does not: it answers a hover, and a hover has no weight to have.
+  const duration = slideSeconds(base, advance);
   const flagged = new Set(preview?.interveningKeys ?? []);
   const last = view.beats - 1;
 
@@ -183,7 +202,7 @@ export function Tally({ view, preview, ghostPositions }: TallyProps) {
                     className="tally__band"
                     initial={false}
                     animate={{ x: `${String(bandFrom * 100)}%`, scaleX: bandSpan }}
-                    transition={{ duration, ease: 'easeOut' }}
+                    transition={{ duration: base, ease: 'easeOut' }}
                     aria-hidden="true"
                   />
                 ) : null}

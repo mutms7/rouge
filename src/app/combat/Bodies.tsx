@@ -9,6 +9,7 @@
  * deliberate. Nothing you can see is allowed to be the only copy of anything.
  */
 import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useRef, useState } from 'react';
 import { ENEMIES } from '../../content/enemies';
 import { Art } from '../art/Art';
 import { useDuration } from '../settings';
@@ -73,19 +74,71 @@ function Bar({ value, max, kind }: { readonly value: number; readonly max: numbe
   );
 }
 
-function Stat({ label, value, after }: { readonly label: string; readonly value: number; readonly after?: number }) {
+/**
+ * A number that counts, rather than one that cuts.
+ *
+ * Salt is the only stat you *accumulate*, and a total that ticks up reads as money in a way a
+ * number that swaps itself out never does. Everything else on the panel jumps, because HP
+ * arriving in instalments would be a lie about what just happened.
+ *
+ * The tween is view-only and forgets itself: it always starts from whatever is on screen and
+ * ends at the value in engine state, so a skipped frame, a fast-forward, or a mid-count second
+ * gain all land on the right total. There is no path where the displayed number is the only
+ * copy of anything.
+ */
+function Counter({ value, seconds }: { readonly value: number; readonly seconds: number }) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+
+  useEffect(() => {
+    if (seconds <= 0 || from.current === value) {
+      from.current = value;
+      setShown(value);
+      return;
+    }
+    const start = from.current;
+    const startedAt = performance.now();
+    let frame = 0;
+    const step = (now: number): void => {
+      const t = Math.min(1, (now - startedAt) / (seconds * 1000));
+      // Ease out, so it arrives rather than stopping.
+      const eased = 1 - (1 - t) * (1 - t);
+      setShown(Math.round(start + (value - start) * eased));
+      if (t < 1) frame = requestAnimationFrame(step);
+      else from.current = value;
+    };
+    frame = requestAnimationFrame(step);
+    return () => {
+      cancelAnimationFrame(frame);
+      from.current = value;
+    };
+  }, [value, seconds]);
+
+  return <>{shown}</>;
+}
+
+function Stat({ label, value, after, count }: {
+  readonly label: string;
+  readonly value: number;
+  readonly after?: number;
+  /** Tween the digits instead of swapping them. Salt only. */
+  readonly count?: true;
+}) {
   const duration = useDuration(0.22);
+  const counting = useDuration(0.55);
   return (
     <span className="stat" data-zero={value === 0 || undefined}>
       <span className="stat__label">{label}</span>
       <motion.span
         className="stat__value"
-        key={value}
-        initial={{ scale: duration > 0 ? 1.35 : 1 }}
+        // A counting stat keeps one element across the change, or the tween would be remounted
+        // at every intermediate value and never move.
+        key={count ? label : value}
+        initial={{ scale: duration > 0 && !count ? 1.35 : 1 }}
         animate={{ scale: 1 }}
         transition={{ duration, ease: 'easeOut' }}
       >
-        {value}
+        {count ? <Counter value={value} seconds={counting} /> : value}
       </motion.span>
       {after !== undefined && after !== value ? <span className="stat__after">{after}</span> : null}
     </span>
@@ -193,9 +246,11 @@ export type PlayerPanelProps = {
   readonly flashes: readonly Flash[];
   readonly guardAfter: number | null;
   readonly hpAfter: number | null;
+  /** Guard went to nothing under a hit this exchange. Drawn, not just heard. */
+  readonly guardBroke: boolean;
 };
 
-export function PlayerPanel({ state, flashes, guardAfter, hpAfter }: PlayerPanelProps) {
+export function PlayerPanel({ state, flashes, guardAfter, hpAfter, guardBroke }: PlayerPanelProps) {
   const shake = useDuration(0.3);
   const player = state.combatants.find((c) => c.team === 'player');
   if (!player) return null;
@@ -206,6 +261,7 @@ export function PlayerPanel({ state, flashes, guardAfter, hpAfter }: PlayerPanel
   return (
     <motion.div
       className="player"
+      data-guard-broke={(guardBroke && shake > 0) || undefined}
       animate={hit && shake > 0 ? { x: [0, -5, 4, -2, 0] } : { x: 0 }}
       transition={{ duration: shake, ease: 'easeOut' }}
     >
@@ -231,7 +287,7 @@ export function PlayerPanel({ state, flashes, guardAfter, hpAfter }: PlayerPanel
             {...(guardAfter !== null ? { after: guardAfter } : {})}
           />
           <Stat label={strings.combat.strain} value={state.strain} />
-          <Stat label={strings.combat.salt} value={state.salt} />
+          <Stat label={strings.combat.salt} value={state.salt} count />
           {player.bleed > 0 ? <Stat label={strings.combat.bleed} value={player.bleed} /> : null}
         </div>
 
