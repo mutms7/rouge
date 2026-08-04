@@ -518,6 +518,7 @@
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1fr);
   gap: calc(var(--space) * 2);
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -673,19 +674,47 @@
   list-style: none;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink-strong) transparent;
   display: flex;
   flex-direction: column-reverse;
   min-height: 0;
+  max-height: 100%;
   min-width: 0;
   flex: 1;
 }
 
+/* Keep the record's scroll affordance legible without inheriting the browser default. */
+.record__list::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.record__list::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--chalk) 30%, transparent);
+  border-left: 1px solid var(--rule);
+}
+
+.record__list::-webkit-scrollbar-thumb {
+  background: var(--ink-strong);
+  border: 2px solid var(--paper);
+  border-radius: 0;
+}
+
+.record__list::-webkit-scrollbar-thumb:hover {
+  background: var(--slate);
+}
+
 .record__line {
   display: grid;
-  grid-template-columns: 2.4em 1fr;
+  grid-template-columns: 2.4em minmax(0, 1fr);
   gap: var(--space);
   min-width: 0;
+  max-width: 100%;
   font-size: calc(12px * var(--font-scale));
   line-height: 1.4;
 }
@@ -718,12 +747,16 @@
 /* --- hand ----------------------------------------------------------------- */
 
 .hand {
+  position: relative;
+  z-index: 0;
   display: flex;
   justify-content: center;
   align-items: flex-end;
   gap: calc(var(--space) * 0.75);
-  min-height: var(--card-h);
+  min-height: calc(var(--card-h) + 2.5em + var(--space));
+  height: calc(var(--card-h) + 2.5em + var(--space));
   padding-top: calc(var(--space) * 2);
+  overflow: visible;
 }
 
 .hand--empty {
@@ -733,11 +766,57 @@
   align-items: center;
 }
 
+.hand__wait {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 11;
+  max-width: min(18em, 45%);
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: calc(var(--space) * 0.5);
+  padding: var(--space);
+  border: 1px dashed var(--ink-strong);
+  background: transparent;
+  color: var(--ink-strong);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: calc(10px * var(--font-scale));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.hand__wait:hover,
+.hand__wait:focus-visible {
+  border-style: solid;
+  background: color-mix(in srgb, var(--chalk) 45%, transparent);
+}
+
+.hand__wait:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.hand__wait kbd {
+  border: 1px solid var(--rule);
+  padding: 0 0.35em;
+  font: inherit;
+  color: var(--ink-quiet);
+}
+
 .hand__slot {
   position: relative;
+  width: var(--card-w);
+  min-width: var(--card-w);
+  min-height: calc(var(--card-h) + 2.5em + var(--space));
   flex: none;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   gap: calc(var(--space) * 0.5);
+  overflow: visible;
 }
 
 /* The zoomed card has to sit over its neighbours, not under them. */

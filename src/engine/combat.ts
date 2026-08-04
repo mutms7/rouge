@@ -310,13 +310,18 @@ export function isPlayable(state: CombatState, uid: string): boolean {
   return (player ? collectMods(player.mods).compoundPlayableAs.length > 0 : false);
 }
 
+/** Whether the hand has any card the player can commit instead of clearing junk. */
+function hasPlayableCard(state: CombatState): boolean {
+  return state.deck.hand.some((instance) => isPlayable(state, instance.uid));
+}
+
 /**
  * Everything the player may legally do right now.
  *
  * The order is stable (hand order, then target order, then wait), which is what makes
  * a greedy sim policy reproducible and what lets keyboard play index into it. Compounds
- * are absent because they are unplayable: junk you have to draw around, not junk you
- * choose not to play.
+ * are normally absent because they are unplayable; an all-junk hand gets an explicit
+ * discard escape hatch so it can make room for the next wait/draw.
  */
 export function legalActions(state: CombatState): Action[] {
   if (!isPlayerTurn(state)) return [];
@@ -339,12 +344,22 @@ export function legalActions(state: CombatState): Action[] {
       actions.push({ k: 'play_card', uid: instance.uid });
     }
   }
-  if (collectMods(player.mods).compoundDiscardFree) {
+  const familiarDiscard = collectMods(player.mods).compoundDiscardFree;
+  const emergencyDiscard = !familiarDiscard && !hasPlayableCard(state);
+  // Familiar makes this an ordinary option and keeps its established priority. Without
+  // it, wait stays first for sim policy; the emergency discard follows as a recovery
+  // action for a hand made entirely of unplayable Compounds.
+  if (familiarDiscard) {
     for (const instance of state.deck.hand) {
       if (state.compoundIds.includes(instance.cardId)) actions.push({ k: 'discard_compound', uid: instance.uid });
     }
   }
   actions.push({ k: 'wait' });
+  if (emergencyDiscard) {
+    for (const instance of state.deck.hand) {
+      if (state.compoundIds.includes(instance.cardId)) actions.push({ k: 'discard_compound', uid: instance.uid });
+    }
+  }
   return actions;
 }
 
@@ -522,7 +537,9 @@ function playCard(draft: Draft, player: DraftCombatant, uid: string, targetId: s
 }
 
 function discardCompound(draft: Draft, player: DraftCombatant, uid: string): void {
-  if (!passivesOf(player).compoundDiscardFree) throw new Error('Compounds cannot be discarded for free');
+  if (!passivesOf(player).compoundDiscardFree && hasPlayableCard(draft)) {
+    throw new Error('Compounds cannot be discarded for free');
+  }
   const instance = draft.deck.hand.find((card) => card.uid === uid);
   if (!instance || !isCompoundDef(draft, instance.cardId)) throw new Error(`${uid} is not a held Compound`);
   removeFromHand(draft, uid);

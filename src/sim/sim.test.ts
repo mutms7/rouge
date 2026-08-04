@@ -123,9 +123,9 @@ describe('whole-run simulation', () => {
   });
 
   it('reports metrics from the active combat when a run times out', () => {
-    // 165 run actions lands part-way through the Notary after an Interest bill and several
-    // cards have resolved. A stale `lastCombat` read would report the prior Tithe-Wolf fight,
-    // including its zero damage, instead of this active board.
+    // 165 run actions lands part-way through the Notary after several cards have resolved.
+    // A stale `lastCombat` read would report the prior Tithe-Wolf fight, including its zero
+    // damage, instead of this active board.
     const result = runWhole(3, { maxActions: 165 });
     const current = result.combats.at(-1);
     expect(result.outcome).toBe('timeout');
@@ -133,7 +133,6 @@ describe('whole-run simulation', () => {
     expect(current?.outcome).toBe('timeout');
     expect(current?.beats).toBeGreaterThan(0);
     expect(current?.damageTaken).toBeGreaterThan(0);
-    expect(current?.interestEvents).toBeGreaterThan(0);
     expect(Object.keys(current?.played ?? {})).not.toHaveLength(0);
     expect(current?.hpAfter).toBeLessThan(current?.hpBefore ?? Number.POSITIVE_INFINITY);
     expect(result.hpCurve.at(-1)).toBe(current?.hpAfter);

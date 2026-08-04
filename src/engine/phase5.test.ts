@@ -129,6 +129,28 @@ describe('phase-five Interest and Compounds', () => {
     expect(reduce(familiar, { k: 'discard_compound', uid: familiarUid }).deck.discard).toHaveLength(1);
   });
 
+  it('offers an emergency Compound discard when the hand is all unplayable junk', () => {
+    const junk = createCombat(
+      setup(['the_notarys_countersign', 'the_notarys_countersign', 'the_notarys_countersign', 'the_notarys_countersign'], {
+        startingHand: 3,
+      }),
+    );
+    const held = junk.deck.hand[0];
+    if (!held) throw new Error('expected a Countersign in hand');
+    const junkActions = legalActions(junk);
+    expect(junkActions[0]).toEqual({ k: 'wait' });
+    expect(junkActions).toContainEqual({ k: 'discard_compound', uid: held.uid });
+    const cleared = reduce(junk, { k: 'discard_compound', uid: held.uid });
+    expect(cleared.deck.hand).toHaveLength(2);
+    expect(cleared.deck.draw).toHaveLength(1);
+    expect(reduce(cleared, { k: 'wait' }).deck.hand).toHaveLength(3);
+
+    const mixed = createCombat(setup(['the_notarys_countersign', 'paper_cut'], { startingHand: 2 }));
+    const mixedJunk = mixed.deck.hand.find((card) => card.cardId === 'the_notarys_countersign');
+    if (!mixedJunk) throw new Error('expected a Countersign in mixed hand');
+    expect(() => reduce(mixed, { k: 'discard_compound', uid: mixedJunk.uid })).toThrow(/cannot be discarded/);
+  });
+
   it('escalates later Interest brackets from generated Compound Load', () => {
     const state = waitTo(
       createCombat(setup(['arrears'], { deckLoad: 39, startingHand: 0, compoundIds: ['arrears'] })),

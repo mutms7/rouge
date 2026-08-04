@@ -95,6 +95,11 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
 
   const interactive = onward === null && isPlayerTurn(state);
   const hand = state.deck.hand;
+  const activeUid = targeting?.uid ?? (hovered && hand.some((card) => card.uid === hovered)
+    ? hovered
+    : interactive
+      ? hand[cursor]?.uid ?? null
+      : null);
 
   // Which card the preview is about: the mouse beats the keyboard, because it moved more
   // recently, and a card being targeted beats both.
@@ -134,6 +139,12 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
     [store],
   );
 
+  const wait = useCallback(() => {
+    const current = store().run?.combat ?? null;
+    if (!current || !isPlayerTurn(current)) return;
+    store().dispatch({ k: 'wait' });
+  }, [store]);
+
   // One listener for the whole screen. `keys.ts` owns the mapping; this owns the wiring.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -168,12 +179,12 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
           current.moveTarget(intent.by);
           break;
         case 'commit': {
-          const uid = current.targeting?.uid ?? live?.deck.hand[current.cursor]?.uid;
+          const uid = current.targeting?.uid ?? current.hovered ?? live?.deck.hand[current.cursor]?.uid;
           if (uid) commit(uid);
           break;
         }
         case 'discard': {
-          const uid = current.targeting?.uid ?? live?.deck.hand[current.cursor]?.uid;
+          const uid = current.targeting?.uid ?? current.hovered ?? live?.deck.hand[current.cursor]?.uid;
           if (uid) discard(uid);
           break;
         }
@@ -299,12 +310,15 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
 
       <Hand
         cards={cards}
+        handCap={state.handCap}
         cursor={cursor}
         hovered={hovered}
+        activeUid={activeUid}
         interactive={interactive}
         onHover={(uid) => { store().setHovered(uid); }}
         onActivate={commit}
         onDiscard={discard}
+        onWait={wait}
       />
 
       {onward === null ? null : (

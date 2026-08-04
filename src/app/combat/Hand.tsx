@@ -27,48 +27,60 @@ export type HandCard = {
 
 export type HandProps = {
   readonly cards: readonly HandCard[];
+  readonly handCap: number;
   readonly cursor: number;
   readonly hovered: string | null;
+  /** The card that owns visual selection (targeting > pointer > keyboard cursor). */
+  readonly activeUid?: string | null;
   readonly interactive: boolean;
   readonly onHover: (uid: string | null) => void;
   readonly onActivate: (uid: string) => void;
   readonly onDiscard: (uid: string) => void;
+  readonly onWait: () => void;
 };
 
-export function Hand({ cards, cursor, hovered, interactive, onHover, onActivate, onDiscard }: HandProps) {
+export function Hand({ cards, handCap, cursor, hovered, activeUid, interactive, onHover, onActivate, onDiscard, onWait }: HandProps) {
   const duration = useDuration(0.22);
+  // A pointer hover is the strongest visual selection. If the pointer is not over a card,
+  // the keyboard cursor remains the accessible fallback. Ignore stale hover ids after a
+  // card leaves the hand so the cursor never appears to disappear.
+  const hoveredCard = hovered !== null && cards.some((card) => card.uid === hovered) ? hovered : null;
+  const visualUid = activeUid ?? hoveredCard ?? (interactive ? cards[cursor]?.uid ?? null : null);
 
-  if (cards.length === 0) {
-    return (
-      <div className="hand hand--empty">
-        <p>{strings.combat.empty}</p>
-      </div>
-    );
-  }
+  const noPlayableChoice = cards.every((card) => !card.face.playable);
+  const waitBlocked = cards.length >= handCap;
+  const waitLabel = waitBlocked ? strings.combat.waitFull : strings.combat.waitNoOptions;
 
   return (
-    <div className="hand" role="group" aria-label={strings.combat.hand}>
+    <div className={`hand${cards.length === 0 ? ' hand--empty' : ''}`} role="group" aria-label={strings.combat.hand}>
+      {cards.length === 0 ? <p>{strings.combat.empty}</p> : null}
       <AnimatePresence initial={false}>
         {cards.map((card, index) => (
           <motion.div
             className="hand__slot"
             key={card.uid}
-            layout={duration > 0}
+            // Slot dimensions are reserved in CSS. Animating layout here would briefly
+            // reflow neighbouring cards while a card is added or removed, which makes a
+            // pointer hover look like a jump even though the card itself only transforms.
+            layout={false}
             initial={{ opacity: 0, y: 28 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24, scale: 0.9 }}
             transition={{ duration, ease: 'easeOut' }}
+            onMouseEnter={() => {
+              onHover(card.uid);
+            }}
+            onMouseLeave={() => {
+              onHover(null);
+            }}
           >
             <CardFace
               face={card.face}
               weight={card.weight}
               printedWeight={card.printedWeight}
               index={index}
-              selected={interactive && index === cursor}
-              hovered={hovered === card.uid}
-              onHover={(isOver) => {
-                onHover(isOver ? card.uid : null);
-              }}
+              selected={interactive && visualUid === card.uid}
+              hovered={interactive && hoveredCard === card.uid}
               onActivate={() => {
                 onActivate(card.uid);
               }}
@@ -89,6 +101,19 @@ export function Hand({ cards, cursor, hovered, interactive, onHover, onActivate,
           </motion.div>
         ))}
       </AnimatePresence>
+      {noPlayableChoice ? (
+        <button
+          type="button"
+          className="hand__wait"
+          disabled={!interactive || waitBlocked}
+          aria-label={waitLabel}
+          aria-keyshortcuts="W"
+          onClick={onWait}
+        >
+          <span>{waitLabel}</span>
+          <kbd>W</kbd>
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -111,7 +136,7 @@ export type ReadoutProps = {
 export function Readout({ preview, card, targeting, waiting }: ReadoutProps) {
   if (!preview) {
     return (
-      <div className="readout readout--prompt">
+      <div className="readout readout--prompt" role="status" aria-live="polite" aria-atomic="true">
         <span>{waiting ? strings.combat.waiting : strings.combat.yourMove}</span>
       </div>
     );
@@ -120,6 +145,7 @@ export function Readout({ preview, card, targeting, waiting }: ReadoutProps) {
   const parts: string[] = [
     strings.preview.cost(preview.weight),
     strings.preview.lands(preview.landsOn),
+    strings.preview.handsOver(preview.span),
     preview.interveningKeys.length === 0
       ? strings.preview.noActions
       : strings.preview.actions(preview.interveningKeys.length),
@@ -130,7 +156,14 @@ export function Readout({ preview, card, targeting, waiting }: ReadoutProps) {
   if (preview.crossesLap) parts.push(strings.preview.lapCrossed);
 
   return (
-    <div className="readout" data-fatal={preview.fatal || undefined} data-wins={preview.wins || undefined}>
+    <div
+      className="readout"
+      data-fatal={preview.fatal || undefined}
+      data-wins={preview.wins || undefined}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <span className="readout__head">
         {card?.def.name ?? strings.preview.heading}
         {targeting ? <span className="readout__prompt">{strings.preview.target}</span> : null}
