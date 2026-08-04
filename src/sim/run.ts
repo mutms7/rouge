@@ -14,9 +14,10 @@ import {
   legalRunActions,
   runReduce,
 } from '../engine/run';
-import type { RunAction, RunPrompt, RunState } from '../engine/runtypes';
-import type { CombatEvent } from '../engine/types';
+import type { RunAction, RunContent, RunPrompt, RunState } from '../engine/runtypes';
+import type { CardDef, CombatEvent } from '../engine/types';
 import { chooseAction } from './policy';
+import { cardDefence, cardOffence, cardValue, defenceCount, offenceCount } from './value';
 
 /** Caps are findings, not silent hangs. A run can still be reported as a timeout. */
 export const MAX_RUN_ACTIONS = 100_000;
@@ -52,10 +53,25 @@ export type RunResult = {
   readonly totalCombatBeats: number;
   readonly totalDamageTaken: number;
   readonly hpCurve: readonly number[];
+  /**
+   * HP on arrival at the nth node visited, index 0 being the first node.
+   *
+   * Per-fight HP hides where a run actually dies, because the Wake and the Hollows sit between
+   * the fights and are half the HP economy. Per node is the curve the brief asks for.
+   */
+  readonly hpAtDepth: readonly number[];
   readonly interestEvents: number;
   readonly interestCompounds: number;
   readonly finalDeckLoad: number;
   readonly finalDeckSize: number;
+  /**
+   * Times the card was on a reward screen or a shop shelf.
+   *
+   * The denominator "never picked" needs. Without it a zero in the picked column could mean
+   * the policy passed on the card forty times or that the draft never offered it once, and
+   * those are opposite findings.
+   */
+  readonly offered: Readonly<Record<string, number>>;
   readonly picked: Readonly<Record<string, number>>;
   /** Number of runs in which the card was picked at least once. */
   readonly pickAppearances: Readonly<Record<string, number>>;
@@ -107,18 +123,72 @@ function effectValue(prompt: Extract<RunPrompt, { k: 'hollow' }>, state: RunStat
   return value;
 }
 
+/**
+ * Attacks the policy will not trade away.
+ *
+ * A greedy policy that ranks removals by Weight sells its Paper Cuts first, arrives at the
+ * Bailiff holding six Guard cards, and then out-blocks the fight for two thousand actions
+ * without ever winning it. That is not a balance finding, it is a policy that cannot lose
+ * and cannot win, and it poisons every number in the table. Offence is a floor.
+ */
+const OFFENCE_FLOOR = 3;
+
+/**
+ * And the same floor from the other side.
+ *
+ * Rate cards by value alone and Flinch is the worst card Wick owns, so the policy sheds all
+ * three of them, walks into the Bailiff with eleven attacks and no Guard, and dies on beat
+ * twelve. Both floors exist to stop the policy from answering a balance question with a
+ * degenerate deck.
+ */
+const DEFENCE_FLOOR = 2;
+
+/**
+ * Deck size the policy will not pay an Assay past, when paying in paper.
+ *
+ * Trading a junk card for a better card is good play and stays allowed. Buying a Token for
+ * two cards, four times in a row, is how a ten-card deck becomes a six-card deck that cannot
+ * kill anything.
+ */
+const PAPER_FLOOR = 9;
+
+function deckDefs(state: RunState): CardDef[] {
+  return state.deck.flatMap((card) => {
+    const def = state.library[card.cardId];
+    return def ? [def] : [];
+  });
+}
+
+/** Ranked by willingness to part with the card: higher means "take this one". */
+function shedScore(state: RunState, def: CardDef): number {
+  if (def.playable === false) return 10_000;
+  const defs = deckDefs(state);
+  const score = -cardValue(def);
+  const lastAttack = cardOffence(def) > 0 && offenceCount(defs) <= OFFENCE_FLOOR;
+  const lastGuard = cardDefence(def) > 0 && defenceCount(defs) <= DEFENCE_FLOOR;
+  return lastAttack || lastGuard ? score - 100 : score;
+}
+
 function cardChoiceScore(state: RunState, prompt: Extract<RunPrompt, { k: 'pick_deck_card' }>, uid: string): number {
   const card = state.deck.find((candidate) => candidate.uid === uid);
   if (!card) return Number.NEGATIVE_INFINITY;
   const def = state.library[card.cardId];
   if (!def) return 0;
-  if (prompt.op === 'remove') {
-    // Compounds and other unplayable cards are pure liability. Among live cards, remove
-    // the heaviest one first to keep the Interest curve under control.
-    return (def.playable === false ? 10_000 : 0) + def.weight;
+  switch (prompt.op) {
+    // Both hand a card over. Settling pays a Mark for it, removal pays nothing, and either
+    // way the card to give up is the one doing the least work.
+    case 'remove':
+    case 'settle':
+      return shedScore(state, def);
+    // An upgrade, and the Weighing Room's heavier upgrade, want to land on a card you will
+    // actually draw and play.
+    case 'upgrade':
+    case 'dip':
+      return cardValue(def);
+    // Pure penalty. Put the extra Load on whatever is already carrying the least.
+    case 'add_load':
+      return -cardValue(def);
   }
-  if (prompt.op === 'settle') return -def.weight;
-  return -def.weight;
 }
 
 /** Stable greedy policy for every layer above combat. */
@@ -138,20 +208,39 @@ export function chooseRunAction(state: RunState): RunAction | null {
   }
 
   if (prompt.k === 'shop') {
-    const affordable = legal.filter((action) => action.k === 'answer');
+    const defs = deckDefs(state);
+    const worst = [...defs].sort((a, b) => shedScore(state, b) - shedScore(state, a));
+    /** Whether a paper price is worth paying, and whether the deck can stand to pay it. */
+    const paperIsWorthIt = (item: (typeof prompt.items)[number]): boolean => {
+      if (item.cards === null) return false;
+      if (state.deck.length - item.cards < PAPER_FLOOR) return false;
+      // A card bought in paper has to beat the cards it costs, or the trade is a downgrade
+      // wearing a purchase's clothes. Tokens and slots cost paper and add none back, so they
+      // are only worth it while the deck is fat, which the floor above already decides.
+      if (item.kind !== 'card') return true;
+      const bought = item.refId ? state.library[item.refId] : undefined;
+      if (!bought) return false;
+      const given = worst.slice(0, item.cards);
+      return given.every((def) => cardValue(bought) > cardValue(def));
+    };
+
     const rank = (action: RunAction): number => {
       if (action.k !== 'answer') return Number.NEGATIVE_INFINITY;
       const item = prompt.items.find((candidate) => candidate.id === action.id);
       if (!item) return Number.NEGATIVE_INFINITY;
+      if (action.pay === 'cards' && !paperIsWorthIt(item)) return Number.NEGATIVE_INFINITY;
       // A card is the best long-term action, then a Token, then a Mark slot. A purchase paid
       // in Salt wins ties over paying with paper, which avoids accidentally hollowing the deck.
       const kind = item.kind === 'card' ? 40 : item.kind === 'token' ? 30 : item.kind === 'slot' ? 20 : 10;
       return kind + (action.pay === 'salt' ? 1 : 0);
     };
-    const best = affordable.reduce<RunAction | null>((current, candidate) => {
-      if (!current || rank(candidate) > rank(current)) return candidate;
-      return current;
-    }, null);
+    const best = legal
+      .filter((action) => action.k === 'answer')
+      .reduce<RunAction | null>((current, candidate) => {
+        if (rank(candidate) === Number.NEGATIVE_INFINITY) return current;
+        if (!current || rank(candidate) > rank(current)) return candidate;
+        return current;
+      }, null);
     return best ?? legal.find((action) => action.k === 'decline') ?? legal[0] ?? null;
   }
 
@@ -181,8 +270,25 @@ export function chooseRunAction(state: RunState): RunAction | null {
     return best ?? legal.find((action) => action.k === 'decline') ?? legal[0] ?? null;
   }
 
-  // Rewards are always accepted, and the first offered id is the deterministic tie-break.
-  if (prompt.k === 'gain_card' || prompt.k === 'gain_token') {
+  // A reward is always accepted. *Which* one it accepts has to be a judgement rather than
+  // "whichever the map listed first", or the pick table measures offer order instead of card
+  // quality and "never picked" stops meaning anything.
+  if (prompt.k === 'gain_card') {
+    const best = legal.reduce<RunAction | null>((current, candidate) => {
+      if (candidate.k !== 'answer') return current;
+      if (!current || current.k !== 'answer') return candidate;
+      const value = (id: string) => {
+        const def = state.library[id];
+        return def ? cardValue(def) : Number.NEGATIVE_INFINITY;
+      };
+      return value(candidate.id) > value(current.id) ? candidate : current;
+    }, null);
+    return best ?? legal[0] ?? null;
+  }
+
+  // Tokens are Marks, not cards, and the value model above has nothing to say about them.
+  // First offered, deterministically.
+  if (prompt.k === 'gain_token') {
     return legal.find((action) => action.k === 'answer') ?? legal[0] ?? null;
   }
 
@@ -197,6 +303,29 @@ function capturePromptPick(state: RunState, action: RunAction, picked: Record<st
   if (prompt.k === 'shop') {
     const item = prompt.items.find((candidate) => candidate.id === action.id);
     if (item?.kind === 'card' && item.refId) addCount(picked, item.refId);
+  }
+}
+
+/**
+ * Every card this prompt put in front of the player, counted once per screen.
+ *
+ * A shop is one shelf the player walks past once, even though buying from it re-pushes the
+ * prompt; counting per action would inflate a shop's stock by however many things got bought.
+ */
+function captureOffers(state: RunState, offered: Record<string, number>, seenShops: Set<string>): void {
+  const prompt = currentPrompt(state);
+  if (!prompt) return;
+  if (prompt.k === 'gain_card') {
+    for (const id of prompt.ids) addCount(offered, id);
+    return;
+  }
+  if (prompt.k === 'shop') {
+    const key = `${state.at ?? ''}:${prompt.items.map((item) => item.id).join(',')}`;
+    if (seenShops.has(key)) return;
+    seenShops.add(key);
+    for (const item of prompt.items) {
+      if (item.kind === 'card' && item.refId) addCount(offered, item.refId);
+    }
   }
 }
 
@@ -262,12 +391,29 @@ function combatResult(
   };
 }
 
-export function runWhole(seed: number, options?: { readonly maxActions?: number; readonly maxCombatActions?: number }): RunResult {
+export function runWhole(
+  seed: number,
+  options?: {
+    readonly maxActions?: number;
+    readonly maxCombatActions?: number;
+    /**
+     * Alternate content, for asking "what would this number do" without editing the act.
+     *
+     * Phase 6 is a conversation about numbers, and a conversation needs both sides of the
+     * table before anything is applied. A balance experiment that has to edit `enemies.ts`
+     * to run is one that gets committed by accident.
+     */
+    readonly content?: RunContent;
+  },
+): RunResult {
   const maxActions = options?.maxActions ?? MAX_RUN_ACTIONS;
   const maxCombatActions = options?.maxCombatActions ?? MAX_RUN_COMBAT_ACTIONS;
-  let state = createRun(RUN_CONTENT, seed);
+  let state = createRun(options?.content ?? RUN_CONTENT, seed);
   const combats: RunCombatResult[] = [];
   const hpCurve: number[] = [state.hp];
+  const hpAtDepth: number[] = [];
+  const offered: Record<string, number> = {};
+  const seenShops = new Set<string>();
   const picked: Record<string, number> = {};
   const pickAppearances: Record<string, number> = {};
   const pickWins: Record<string, number> = {};
@@ -319,9 +465,13 @@ export function runWhole(seed: number, options?: { readonly maxActions?: number;
       timeoutAt = state.at;
       break;
     }
+    captureOffers(state, offered, seenShops);
     capturePromptPick(state, action, picked);
     state = runReduce(state, action);
     actions += 1;
+    // Travelling is the only thing that grows `visited`, and a fight created by arriving keeps
+    // its own copy of the player, so run HP here is still the HP the node was entered with.
+    if (state.visited.length > hpAtDepth.length) hpAtDepth.push(state.hp);
   }
 
   if (state.outcome === 'ongoing' && !timedOut) {
@@ -343,10 +493,12 @@ export function runWhole(seed: number, options?: { readonly maxActions?: number;
     totalCombatBeats: combats.reduce((total, combat) => total + combat.beats, 0),
     totalDamageTaken: combats.reduce((total, combat) => total + combat.damageTaken, 0),
     hpCurve,
+    hpAtDepth,
     interestEvents: combats.reduce((total, combat) => total + combat.interestEvents, 0),
     interestCompounds: combats.reduce((total, combat) => total + combat.interestCompounds, 0),
     finalDeckLoad: deckLoadOf(state),
     finalDeckSize: state.deck.length,
+    offered,
     picked,
     pickAppearances,
     pickWins,

@@ -7,7 +7,7 @@
  * on every machine. Balance arguments are only worth having if the numbers hold still.
  */
 import { ENCOUNTERS } from '../content/enemies';
-import { buildReport, buildRunReport, formatOutliers, formatReport, formatRunReport } from './report';
+import { buildReport, buildRunReport, formatOutliers, formatReport, formatRunOutliers, formatRunReport } from './report';
 import { runTrial } from './trial';
 import type { TrialResult } from './trial';
 import { runWhole } from './run';
@@ -68,7 +68,12 @@ function main(): void {
   const options = parseArgs(process.argv.slice(2));
   if (!options.combats) {
     const runs = Array.from({ length: options.runs }, (_, index) => runWhole(options.seed + index * 100_003));
-    console.log(formatRunReport(buildRunReport(runs, options.seed)));
+    const report = buildRunReport(runs, options.seed);
+    console.log(formatRunReport(report));
+    if (options.cards) {
+      console.log('');
+      console.log(formatRunOutliers(report));
+    }
     return;
   }
 
