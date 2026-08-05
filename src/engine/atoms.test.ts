@@ -437,6 +437,29 @@ describe('enemy traits', () => {
     expect(playerOf(state).hp).toBe(56);
   });
 
+  it('copies only what you aimed at it, so your own Guard cannot arm it', () => {
+    // The distinction phase 6 had to draw. Mirroring a self-targeted card handed the Wraith the
+    // same Guard, which turned the encounter into a stalemate engine that scaled with the
+    // defensive half of the player's deck: raising Flinch from 5 to 8 took the fight from 19
+    // beats to 77, with neither side able to finish.
+    const wraith = {
+      id: 'wraith',
+      hp: 200,
+      mods: [{ k: 'mirror_last_card' }] as const,
+      intents: [{ id: 'blank', weight: 3, targeting: 'opponent' as const, effects: [{ k: 'damage' as const, n: 1 }] }],
+    };
+
+    const guarded = play(dummyCombat({ deck: ['wall', 'jab'], enemies: [wraith] }), 'wall');
+    expect(combatantOf(guarded, 'wraith').guard).toBe(0);
+    expect(guarded.log.some((e) => e.event.k === 'act' && e.event.what === 'mirror_wall')).toBe(false);
+    // It falls back to the blank it was given, which is the whole reason it has one.
+    expect(guarded.log.some((e) => e.event.k === 'act' && e.event.what === 'blank')).toBe(true);
+
+    // An attack still comes straight back, which is the lesson the fight is built to teach.
+    const struck = play(dummyCombat({ deck: ['jab', 'wall'], enemies: [wraith] }), 'jab');
+    expect(struck.log.some((e) => e.event.k === 'act' && e.event.what === 'mirror_jab')).toBe(true);
+  });
+
   it('bites when you play something heavy, and not otherwise', () => {
     const hound = {
       id: 'hound',

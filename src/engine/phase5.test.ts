@@ -308,6 +308,66 @@ describe('phase-five Interest and Compounds', () => {
     expect(second.countersignCancelledLap).toBe(0);
   });
 
+  it('fills the pen at the rate the mod says, and files where it says', () => {
+    const hit: CardDef = {
+      id: 'hit',
+      name: 'Hit',
+      weight: 1,
+      type: 'attack',
+      targeting: 'opponent',
+      effects: [{ k: 'damage', n: 1 }],
+    };
+    const library = { ...CARDS, hit };
+    const notary = (mods: Mod[]) =>
+      createCombat({
+        seed: 77,
+        library,
+        player: { hp: 68 },
+        enemies: [
+          {
+            id: 'the_notary',
+            hp: 400,
+            // Nothing to cancel the countersign with, so the rate is the only variable.
+            intents: [{ id: 'wait', weight: 40, targeting: 'self' as const, effects: [] }],
+            mods,
+          },
+        ],
+        // Deep enough that six plays never empty the draw pile. A reshuffle would sweep the
+        // filed copies back into the draw pile and make the two destinations indistinguishable,
+        // which is the very difference under test.
+        deck: Array.from({ length: 20 }, () => 'hit'),
+        startingHand: 6,
+      });
+
+    const playSix = (state: CombatState): CombatState => {
+      let current = state;
+      for (let i = 0; i < 6; i += 1) {
+        const uid = current.deck.hand.find((card) => card.cardId === 'hit')?.uid;
+        if (!uid) break;
+        current = reduce(current, { k: 'play_card', uid });
+      }
+      return current;
+    };
+
+    const junk = (state: CombatState) => state.log.filter((entry) => entry.event.k === 'compound');
+
+    // Every card, as §6 prints it.
+    expect(junk(playSix(notary([{ k: 'countersign' }])))).toHaveLength(6);
+    // Every second card, as the Notary is actually configured.
+    expect(junk(playSix(notary([{ k: 'countersign', everyNth: 2 }])))).toHaveLength(3);
+
+    // And into the pile the mod names. The draw pile is what makes the flood immediate; the
+    // discard is what delays it by a reshuffle.
+    const drawn = playSix(notary([{ k: 'countersign', to: 'draw' }]));
+    const filed = playSix(notary([{ k: 'countersign', to: 'discard' }]));
+    const held = (state: CombatState, pile: 'draw' | 'discard') =>
+      state.deck[pile].filter((card) => card.cardId === 'the_notarys_countersign').length;
+    expect(held(drawn, 'draw')).toBeGreaterThan(0);
+    expect(held(drawn, 'discard')).toBe(0);
+    expect(held(filed, 'discard')).toBe(6);
+    expect(held(filed, 'draw')).toBe(0);
+  });
+
   it('stamps one active Mark per lap after the Notary changes phase', () => {
     const hit: CardDef = {
       id: 'hit',
