@@ -43,16 +43,23 @@ describe('variant ids', () => {
 });
 
 describe('deriving a variant', () => {
+  // Written as deltas off whatever the card currently prints, so a balance pass moving Paper Cut
+  // or Flinch does not land here as a failure. The curve is the thing under test, not the number.
+  const printed = (def: CardDef, kind: string): number =>
+    def.effects.reduce((found, effect) => (effect.k === kind && 'n' in effect ? effect.n : found), 0);
+
   it('bumps the numbers and says so in the name', () => {
     const up = deriveVariant(paperCut, { baseId: 'paper_cut', upgraded: true, load: 0 });
     expect(up.name).toBe('Paper Cut +');
-    expect(up.effects).toEqual([{ k: 'damage', n: 7 }]);
+    expect(up.effects).toEqual([{ k: 'damage', n: printed(paperCut, 'damage') + 2 }]);
     expect(up.baseId).toBe('paper_cut');
   });
 
   it('keeps Guard and damage on their own curves', () => {
     const up = deriveVariant(flinch, { baseId: 'flinch', upgraded: true, load: 0 });
-    expect(up.effects).toEqual([{ k: 'guard', n: 8 }]);
+    // Guard upgrades by 3 where damage upgrades by 2: a point of Guard is worth less than a point
+    // of damage, so it takes more of them to feel like an upgrade.
+    expect(up.effects).toEqual([{ k: 'guard', n: printed(flinch, 'guard') + 3 }]);
   });
 
   /**

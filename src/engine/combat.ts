@@ -553,6 +553,27 @@ function isCompoundDef(draft: Draft, cardId: string): boolean {
   return draft.compoundIds.includes(cardId);
 }
 
+/**
+ * The Notary's stamp, and how fast it can write.
+ *
+ * §6 says every card you play gets countersigned into your draw pile: play fast and you drown
+ * yourself, play slow and it kills you. As printed, that is not a dilemma, it is a lockout. The
+ * copies are Load 2 and irremovable, they land in the pile you are actively drawing from, and the
+ * hand caps at ten, so ten thousand runs put the player at beat 32 holding seven unplayable cards
+ * with no legal way to shed them: `discard_compound` is only offered once *nothing* in hand is
+ * playable. The boss then sat on 30 HP for thirty beats and killed a player who could not act.
+ *
+ * Two knobs on the mod, both content-owned, and the pressure survives both:
+ *
+ * - Filed into the *discard*, so a copy reaches your hand after a reshuffle rather than within
+ *   two draws. Playing fast still buries you, because playing fast is what makes you reshuffle.
+ *   It buries you a lap later, which is the difference between a tightening fight and a dead one.
+ * - Every second card rather than every card, so a full lap of Weight 1 play costs a dozen Load
+ *   instead of two dozen.
+ *
+ * `cardsPlayed` is the counter, not `cardsThisLap`, so the pen does not reset its count at a lap
+ * boundary and hand a fast player a free card every 24 beats.
+ */
 function countersignCard(draft: Draft): void {
   const lap = lapOf(draft.beat);
   if (draft.countersignCancelledLap === lap) return;
@@ -560,7 +581,11 @@ function countersignCard(draft: Draft): void {
     (combatant) => combatant.team === 'enemy' && isAlive(combatant) && passivesOf(combatant).countersign && combatant.phase === 1,
   );
   if (!notary || !draft.library['the_notarys_countersign']) return;
-  addCompoundCard(draft, 'the_notarys_countersign', 'draw');
+
+  const passives = passivesOf(notary);
+  const everyNth = Math.max(1, passives.countersignEveryNth);
+  if (draft.cardsPlayed % everyNth !== 0) return;
+  addCompoundCard(draft, 'the_notarys_countersign', passives.countersignTo);
 }
 
 function boonPerjury(boons: readonly CardBoon[]): number | null {
@@ -814,16 +839,29 @@ function stampMarkAtLapEnd(draft: Draft, lap: number): void {
 // Enemy turns
 // ---------------------------------------------------------------------------
 
-/** The Receipt Wraith's next intent is a copy of the last card you played. */
+/**
+ * The Receipt Wraith's next intent is a copy of the last card you played *at it*.
+ *
+ * "At it" is the part phase 6 had to add. It used to copy anything, including a card aimed at
+ * yourself, which meant a Guard card gave the Wraith the same Guard. That reads fine (it repeats
+ * what you said) and plays terribly: the copy scales with the defensive half of your deck, so
+ * raising Flinch from 5 to 8 turned a 19-beat fight into a 77-beat one, three laps on a Debtor
+ * node, with neither side able to finish. It is a stalemate engine rather than an encounter.
+ *
+ * Restricted to outward cards, the fight keeps the lesson it was built for and loses the loop:
+ * your attacks come back at you, your caution does not arm it. Anything aimed inward leaves it on
+ * its scripted blank, which is the whole point of it having one.
+ */
 function intentFor(draft: Draft, enemy: DraftCombatant): IntentDef {
   const scripted = enemy.intents[enemy.intentIndex % enemy.intents.length] as IntentDef;
   if (!passivesOf(enemy).mirrorLastCard) return scripted;
   const mirrored = draft.lastPlayed === null ? undefined : draft.library[draft.lastPlayed.cardId];
   if (!mirrored) return scripted;
+  if (mirrored.targeting === 'self') return scripted;
   return {
     id: `mirror_${mirrored.id}`,
     weight: Math.max(1, mirrored.weight),
-    targeting: mirrored.targeting === 'self' || mirrored.targeting === 'none' ? 'self' : 'opponent',
+    targeting: mirrored.targeting === 'none' ? 'self' : 'opponent',
     effects: mirrored.effects.filter((e) => e.k !== 'echo' && e.k !== 'exhaust' && e.k !== 'draw'),
   };
 }

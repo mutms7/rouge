@@ -140,9 +140,10 @@ describe('the deck value model', () => {
     expect(cardOffence(card('paper_cut'))).toBe(5);
     expect(cardDefence(card('paper_cut'))).toBe(0);
     expect(cardOffence(card('flinch'))).toBe(0);
-    expect(cardDefence(card('flinch'))).toBe(5);
-    // Alibi's Perjury pays out in Guard, so the deep walk has to see it.
-    expect(cardDefence(card('alibi'))).toBe(9);
+    expect(cardDefence(card('flinch'))).toBe(8);
+    // Alibi's Perjury pays out in Guard, so the deep walk has to see both halves: 5 up front and
+    // the 6 it promises.
+    expect(cardDefence(card('alibi'))).toBe(11);
     // Grifter's Cough is 3 damage and Bleed 4, and the Bleed is damage too.
     expect(cardOffence(card('grifters_cough'))).toBeGreaterThan(3);
   });

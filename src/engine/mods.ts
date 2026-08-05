@@ -74,6 +74,10 @@ export type Passives = {
   readonly compoundPlayableAs: readonly Effect[];
   readonly compoundDiscardFree: boolean;
   readonly countersign: boolean;
+  /** Which pile a countersigned copy is filed into. */
+  readonly countersignTo: 'draw' | 'discard';
+  /** How many of your cards it takes to fill his pen. */
+  readonly countersignEveryNth: number;
   readonly stampMarks: number;
 
   readonly onCombatStart: readonly KeyedEffects[];
@@ -130,6 +134,8 @@ const EMPTY: Passives = {
   compoundPlayableAs: [],
   compoundDiscardFree: false,
   countersign: false,
+  countersignTo: 'draw',
+  countersignEveryNth: 1,
   stampMarks: 0,
   onCombatStart: [],
   onLapStart: [],
@@ -340,6 +346,9 @@ export function collectMods(mods: readonly Mod[]): Passives {
         break;
       case 'countersign':
         p.countersign = true;
+        if (mod.to !== undefined) p.countersignTo = mod.to;
+        // Slowest pen wins, so two sources of the trait cannot stack into a faster flood.
+        if (mod.everyNth !== undefined) p.countersignEveryNth = Math.max(p.countersignEveryNth, mod.everyNth);
         break;
       case 'stamp_marks':
         p.stampMarks += mod.n;

@@ -83,9 +83,14 @@ const NORMAL: readonly EnemyDef[] = [
     name: 'Receipt Wraith',
     hp: 30,
     tier: 'normal',
-    // Its next intent is a copy of the last card you played, so the fight is partly about
+    // Its next intent is a copy of the last card you played at it, so the fight is partly about
     // what you are willing to say in front of it.
-    intents: [{ id: 'wraith_blank', weight: 3, targeting: 'opponent', effects: [{ k: 'damage', n: 4 }] }],
+    //
+    // The blank carries more than §11 printed because the mirror now carries less. Restricting the
+    // copy to outward cards (see `intentFor`) took the fight from 20 HP a visit to 5, which made
+    // the softest node in the act out of one that is supposed to make you think. 7 puts it back in
+    // the middle of the Debtor band, and it fires on the beats you did *not* threaten it.
+    intents: [{ id: 'wraith_blank', weight: 3, targeting: 'opponent', effects: [{ k: 'damage', n: 7 }] }],
     mods: [{ k: 'mirror_last_card' }],
   }),
   enemy({
@@ -101,11 +106,14 @@ const NORMAL: readonly EnemyDef[] = [
   enemy({
     id: 'fined',
     name: 'Fined',
-    hp: 40,
+    // 40 HP behind 70% damage reduction is 133 effective HP, and 11 damage every 5 beats is
+    // 2.2 a beat: elite numbers on a Debtor node. It cost 43 HP a fight and killed 1,130 runs.
+    // Trimmed to a normal node's budget without touching the lesson, which is target priority.
+    hp: 32,
     tier: 'normal',
     // A person under a pile of paperwork. Hitting the person is nearly pointless until
     // the paperwork is gone, which makes it a target-priority fight with a hard answer.
-    intents: [{ id: 'fined_plead', weight: 5, targeting: 'opponent', effects: [{ k: 'damage', n: 11 }] }],
+    intents: [{ id: 'fined_plead', weight: 6, targeting: 'opponent', effects: [{ k: 'damage', n: 11 }] }],
     mods: [{ k: 'shielded_by', allyId: 'fined_paperwork', pct: 70 }],
   }),
   enemy({
@@ -122,23 +130,34 @@ const NORMAL: readonly EnemyDef[] = [
 // ---------------------------------------------------------------------------
 
 const COLLECTORS: readonly EnemyDef[] = [
+  /*
+   * Kesk and Ledger. Two bodies at 2x45 HP, each swinging every 4 beats, each doubling when the
+   * other dies: 3.75 damage a beat before the doubling, against a Chalk Debtor's 1.75, over a
+   * fight the player needs 26 beats to finish. It won 1.6% of 5,964 attempts and killed 74% of
+   * all runs between its two map slots. No arrival HP makes that arithmetic work.
+   *
+   * Cut as *cadence* rather than as damage: both still hit for exactly what §11 prints, they just
+   * hit half as often. A bailiff should read as slow and inevitable rather than as fast, and the
+   * doubling becomes the decision the pair is built around instead of a death sentence for
+   * taking the first kill on offer.
+   */
   enemy({
     id: 'bailiff_kesk',
     name: 'Bailiff Kesk',
-    hp: 45,
+    hp: 26,
     tier: 'collector',
-    intents: [{ id: 'kesk_seize', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 9 }] }],
+    intents: [{ id: 'kesk_seize', weight: 8, targeting: 'opponent', effects: [{ k: 'damage', n: 9 }] }],
     mods: [{ k: 'on_ally_death_double' }],
   }),
   enemy({
     id: 'bailiff_ledger',
     name: 'Ledger',
-    hp: 45,
+    hp: 26,
     tier: 'collector',
     intents: [
       {
         id: 'ledger_record',
-        weight: 4,
+        weight: 8,
         targeting: 'opponent',
         effects: [
           { k: 'damage', n: 6 },
@@ -187,29 +206,40 @@ const COLLECTORS: readonly EnemyDef[] = [
  * which is where the design doc puts them. The re-ink window is live now because it is
  * one atom and the sim should be able to see it.
  */
+/*
+ * Both lists still sum to exactly 24 beats. That is not decoration: it is what puts the re-ink
+ * window on the same two beats of every lap, and it is the reason the fight is learnable rather
+ * than lucky. Nothing below changes a weight.
+ *
+ * The trim is a point off each swing, two off the Seal, three off the Final Notice, and nothing at
+ * all off the flurries. It is that small because the first pass measured the fight with the
+ * countersign flood in place and concluded the boss needed its HP halved. It did not: it needed
+ * the stamp to stop burying the player's deck (see `countersignCard`). With that fixed, 180 HP and
+ * these numbers is a 42% fight costing 39 HP, which is what an Act 1 wall should be.
+ */
 const NOTARY_PHASE_1 = [
-  { id: 'notary_stamp', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 9 }] },
+  { id: 'notary_stamp', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 8 }] },
   { id: 'notary_file', weight: 4, targeting: 'self', effects: [{ k: 'guard', n: 12 }] },
   {
     id: 'notary_summons',
     weight: 4,
     targeting: 'opponent',
     effects: [
-      { k: 'damage', n: 7 },
+      { k: 'damage', n: 6 },
       { k: 'slip', n: 3 },
     ],
   },
-  { id: 'notary_endorse', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 9 }] },
-  { id: 'notary_seal', weight: 6, targeting: 'opponent', effects: [{ k: 'damage', n: 14 }] },
+  { id: 'notary_endorse', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 8 }] },
+  { id: 'notary_seal', weight: 6, targeting: 'opponent', effects: [{ k: 'damage', n: 12 }] },
   { id: 'notary_reink', weight: 2, targeting: 'self', effects: [{ k: 'vulnerable', beats: 2, multiplier: 3 }] },
 ] as const;
 
 const NOTARY_PHASE_2 = [
-  { id: 'notary_strike_out', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 11 }] },
+  { id: 'notary_strike_out', weight: 4, targeting: 'opponent', effects: [{ k: 'damage', n: 10 }] },
   { id: 'notary_flurry', weight: 3, targeting: 'opponent', effects: [{ k: 'damage', n: 6 }] },
   { id: 'notary_flurry_again', weight: 3, targeting: 'opponent', effects: [{ k: 'damage', n: 6 }] },
   { id: 'notary_amend', weight: 4, targeting: 'self', effects: [{ k: 'guard', n: 10 }] },
-  { id: 'notary_final_notice', weight: 8, targeting: 'opponent', effects: [{ k: 'damage', n: 20 }] },
+  { id: 'notary_final_notice', weight: 8, targeting: 'opponent', effects: [{ k: 'damage', n: 17 }] },
   { id: 'notary_reink_again', weight: 2, targeting: 'self', effects: [{ k: 'vulnerable', beats: 2, multiplier: 3 }] },
 ] as const;
 
@@ -217,12 +247,27 @@ const BOSSES: readonly EnemyDef[] = [
   enemy({
     id: 'the_notary',
     name: 'The Notary',
+    /*
+     * §11's printed 180, kept.
+     *
+     * The proposal that came out of the first pass cut this to 100, because at 180 the fight ran
+     * 30 beats and cost 42 HP against an average arrival of 35. That cut was paying for the
+     * countersign flood, not for the HP: with the stamp filing every second card into the discard
+     * instead of every card into the draw pile, the same 180 HP is a 48% fight that costs 36. A
+     * boss should be a wall, and this one gets to stay one.
+     */
     hp: 180,
     tier: 'boss',
     artKind: 'bosses',
     intents: NOTARY_PHASE_1,
     phases: [NOTARY_PHASE_2],
-    mods: [{ k: 'phase_at_hp_pct', pct: 50 }, { k: 'countersign' }, { k: 'stamp_marks', n: 1 }],
+    mods: [
+      { k: 'phase_at_hp_pct', pct: 50 },
+      // Filed, not dealt, and every second card. See `countersignCard` for why the printed
+      // "every card, into your draw pile" is a lockout rather than the dilemma §6 describes.
+      { k: 'countersign', to: 'discard', everyNth: 2 },
+      { k: 'stamp_marks', n: 1 },
+    ],
   }),
 ];
 

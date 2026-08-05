@@ -210,8 +210,15 @@ export type Mod =
   | { readonly k: 'salt_hoard_decay'; readonly n: number }
   /** The Notary swaps its intent list at `pct` HP. */
   | { readonly k: 'phase_at_hp_pct'; readonly pct: number }
-  /** Every card you play is written back into your draw pile as a Compound. */
-  | { readonly k: 'countersign' }
+  /**
+   * Every card you play is written back into your deck as a Compound. §6, the Notary.
+   *
+   * Both knobs are here rather than baked in, because the rate is the whole fight. `to` is
+   * which pile the copy is filed into, and `everyNth` is how many of your cards it takes to
+   * fill his pen: 1 is the design's opening sentence, 2 halves the flood without changing what
+   * the fight is about.
+   */
+  | { readonly k: 'countersign'; readonly to?: 'draw' | 'discard'; readonly everyNth?: number }
   /** Phase 2 of the Notary: one of your Marks goes dark per lap. */
   | { readonly k: 'stamp_marks'; readonly n: number }
 

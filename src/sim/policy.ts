@@ -47,7 +47,6 @@ const WEIGHTS = {
   guardSpare: 0.15,
   draw: 2.5,
   slip: 1.1,
-  haste: 1.1,
   heal: 0.9,
   salt: 0.08,
   junk: 3,
@@ -221,14 +220,20 @@ export function scoreAction(state: CombatState, action: Action): number {
     targets.length === 0 ? 1 : targets.reduce((total, c) => total + vulnerabilityOf(state, c), 0) / targets.length;
 
   let value = 0;
+  /*
+   * Every action draws a card, §3.2, including this one.
+   *
+   * Constant across cards, so it does not change how two cards rank against each other, but it is
+   * the whole comparison against `wait`, which *was* being credited for its draw while cards were
+   * not. Without it the policy would rather stand still than play a card whose only merit is that
+   * it costs nothing, which is exactly what Slip the Knot and Unwritten are for.
+   */
+  value += WEIGHTS.draw;
   value += estimate.damage * vulnerability * WEIGHTS.damage;
   value += Math.min(estimate.guard, guardNeed) * WEIGHTS.guardNeeded;
   value += Math.max(0, estimate.guard - guardNeed) * WEIGHTS.guardSpare;
   value += estimate.draw * WEIGHTS.draw;
   value += estimate.slip * WEIGHTS.slip;
-  // Haste can only claw back beats this card just spent: the marker never goes behind the
-  // clock, and at decision time the player is already on it.
-  value += Math.min(estimate.hasteBeats, weight) * WEIGHTS.haste;
   value += Math.min(estimate.heal, player.maxHp - player.hp) * WEIGHTS.heal;
   value += estimate.salt * WEIGHTS.salt;
   value -= estimate.junk * WEIGHTS.junk;
@@ -262,8 +267,18 @@ export function scoreAction(state: CombatState, action: Action): number {
     }
   }
 
-  // Damage per beat. Weight is the whole cost, so this is the number that matters.
-  return value / (weight + 1);
+  /*
+   * Damage per beat. Weight is the whole cost, so this is the number that matters.
+   *
+   * Haste belongs in the denominator, not the numerator. It can only claw back beats this card
+   * just spent, since the marker never goes behind the clock and the player is already on it, so
+   * what it actually does is make the card cheaper. Crediting it as a *benefit* while still
+   * dividing by the gross Weight prices a card that refunds its own cost as though it cost full
+   * price: Slip the Knot at Weight 3 with Haste 3 is a free action, and the old arithmetic scored
+   * it below `wait` and never played it once in 10,000 runs. Same for Doubling Back.
+   */
+  const hasted = Math.min(estimate.hasteBeats, weight);
+  return value / (weight - hasted + 1);
 }
 
 /**

@@ -50,7 +50,12 @@ const COMMON: readonly Card[] = [
     weight: 1,
     type: 'skill',
     targeting: 'self',
-    effects: [{ k: 'guard', n: 5 }],
+    // §9 prints Guard 5. The sim's argument, at 10,000 runs: Guard 5 for a whole beat, when a
+    // beat of attacking is 5 damage and Guard decays before the swing arrives, is a losing
+    // trade in a race you are already losing. The policy shed its Flinches at every
+    // opportunity and took them from a shop 4.7% of the time it was offered one. Guard is the
+    // defensive half of the entire game and it has to be worth the beat it costs.
+    effects: [{ k: 'guard', n: 8 }],
     mark: markOf('braced'),
   }),
   card({
@@ -86,8 +91,11 @@ const COMMON: readonly Card[] = [
     weight: 1,
     type: 'skill',
     targeting: 'self',
+    // The face value comes up with Flinch's; the Perjury payload does not. The promise is
+    // already priced for the risk that it fizzles, and doubling both would make the safe half
+    // of a gamble card better than the gamble.
     effects: [
-      { k: 'guard', n: 3 },
+      { k: 'guard', n: 5 },
       { k: 'perjury', in: 4, effects: [{ k: 'guard', n: 6 }] },
     ],
     mark: markOf('corroborated'),
@@ -107,11 +115,26 @@ const COMMON: readonly Card[] = [
     mark: markOf('light_fingers'),
   }),
   card({
+    /*
+     * §9 prints this as Weight 0, Strain 2, Haste 3, and as printed it cannot do anything.
+     *
+     * Haste moves your marker back, and §3.1 forbids the marker going behind the clock, so
+     * `haste` clamps at the current beat. Playing a card advances the marker by its Weight
+     * *first*, which is what makes Doubling Back's Haste 5 mean something. At Weight 0 there is
+     * nothing to claw back, so the card reads "Strain 2: do nothing". The sim is unambiguous:
+     * 6,209 offers, 1,062 picks, and zero plays across 10,000 runs.
+     *
+     * Weight 3 is the smallest change that makes the printed Haste 3 do exactly what the card
+     * says. It still resolves to a free action, which is the card's whole idea, and Strain 2 is
+     * still the price. What changes is that the free action is now real, and that a Slip landing
+     * on you mid-lap can leave the Haste with less to undo, which is a decision rather than a
+     * dead card.
+     */
     id: 'slip_the_knot',
     name: 'Slip the Knot',
     suit: 'lie',
     rarity: 'common',
-    weight: 0,
+    weight: 3,
     type: 'skill',
     targeting: 'none',
     effects: [
@@ -119,6 +142,7 @@ const COMMON: readonly Card[] = [
       { k: 'haste', n: 3 },
     ],
     mark: markOf('loose_weave'),
+    textOverride: 'Strain 2. Haste 3, which undoes this card’s own Weight.',
   }),
   card({
     id: 'cold_read',
@@ -172,7 +196,7 @@ const COMMON: readonly Card[] = [
     type: 'skill',
     targeting: 'self',
     effects: [
-      { k: 'guard', n: 4 },
+      { k: 'guard', n: 6 },
       { k: 'draw', n: 1 },
     ],
     mark: markOf('windbag'),
@@ -256,11 +280,11 @@ const UNCOMMON: readonly Card[] = [
     type: 'skill',
     targeting: 'self',
     effects: [
-      { k: 'guard', n: 12 },
+      { k: 'guard', n: 16 },
       { k: 'next_lap', effects: [{ k: 'self_damage', n: 6 }] },
     ],
     mark: markOf('bond'),
-    textOverride: 'Guard 12. Next lap, take 6 damage.',
+    textOverride: 'Guard 16. Next lap, take 6 damage.',
   }),
   card({
     id: 'sixpence_trick',
@@ -339,11 +363,11 @@ const UNCOMMON: readonly Card[] = [
     type: 'skill',
     targeting: 'all_opponents',
     effects: [
-      { k: 'guard', n: 16 },
+      { k: 'guard', n: 20 },
       { k: 'slip', n: 3 },
     ],
     mark: markOf('stillness'),
-    textOverride: 'Guard 16. All enemies Slip 3.',
+    textOverride: 'Guard 20. All enemies Slip 3.',
   }),
   card({
     id: 'false_ledger',
@@ -492,7 +516,7 @@ const NEUTRAL: readonly Card[] = [
     weight: 1,
     type: 'skill',
     targeting: 'self',
-    effects: [{ k: 'guard', n: 4, frozenFor: 3 }],
+    effects: [{ k: 'guard', n: 7, frozenFor: 3 }],
     mark: markOf('drawn_line'),
   }),
   card({

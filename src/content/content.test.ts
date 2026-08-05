@@ -123,11 +123,14 @@ describe('rules text', () => {
   });
 
   it('generates the doc wording for the plain cards', () => {
+    // Numbers are phase 6's to move; the *sentences* are what this pins down. Each of these is a
+    // different shape of generated line: one atom, two atoms, a nested Perjury, a modifier on the
+    // atom, and a flag on a damage atom.
     expect(cardText(CARDS.paper_cut!)).toBe('Deal 5.');
-    expect(cardText(CARDS.flinch!)).toBe('Guard 5.');
+    expect(cardText(CARDS.flinch!)).toBe('Guard 8.');
     expect(cardText(CARDS.small_print!)).toBe('Deal 4. Slip 2.');
-    expect(cardText(CARDS.alibi!)).toBe('Guard 3. Perjury 4: Guard 6.');
-    expect(cardText(CARDS.chalk_line!)).toBe('Guard 4, which does not decay for 3 beats.');
+    expect(cardText(CARDS.alibi!)).toBe('Guard 5. Perjury 4: Guard 6.');
+    expect(cardText(CARDS.chalk_line!)).toBe('Guard 7, which does not decay for 3 beats.');
     expect(cardText(CARDS.pry_bar!)).toBe('Deal 8, ignores Guard.');
   });
 });
@@ -141,12 +144,19 @@ describe('Load and Interest', () => {
 
   it('reads the Interest table off deck Load', () => {
     expect(compoundsPerLap(0)).toBe(0);
-    expect(compoundsPerLap(24)).toBe(0);
-    expect(compoundsPerLap(25)).toBe(1);
-    expect(compoundsPerLap(39)).toBe(1);
-    expect(compoundsPerLap(40)).toBe(2);
-    expect(compoundsPerLap(55)).toBe(3);
+    expect(compoundsPerLap(14)).toBe(0);
+    expect(compoundsPerLap(15)).toBe(1);
+    expect(compoundsPerLap(29)).toBe(1);
+    expect(compoundsPerLap(30)).toBe(2);
+    expect(compoundsPerLap(45)).toBe(3);
     expect(compoundsPerLap(200)).toBe(3);
+  });
+
+  it('leaves the ten-card starter under the first threshold and bills the deck you grew', () => {
+    // The point of the table, and the reason its bands moved in phase 6: the deck you are handed
+    // is free to keep, and everything you add on top of it is what Interest is for.
+    expect(compoundsPerLap(deckLoad(WICK.deck))).toBe(0);
+    expect(compoundsPerLap(deckLoad([...WICK.deck, 'bad_faith', 'ninth_tongue']))).toBe(1);
   });
 
   it('starts Wick well under the first Interest bracket', () => {
@@ -232,7 +242,26 @@ describe('the bridge into the engine', () => {
       const run = () => {
         let state = createCombat(fightSetup({ seed: 4, encounterId: encounter.id }));
         for (let step = 0; step < 400 && state.outcome === 'ongoing'; step += 1) {
-          const action = legalActions(state)[0];
+          /*
+           * Attacks first, then whatever is at the front of the hand.
+           *
+           * Taking `legalActions[0]` blindly used to work and now stalls against the Receipt
+           * Wraith forever, for a reason that is the encounter working rather than failing: it
+           * mirrors your last card as its next intent, so a driver that alternates Paper Cut and
+           * Flinch hands it Guard 8 every other beat and it out-blocks the damage. 479 beats,
+           * player on 127 Guard, Wraith on 22 HP, neither able to finish.
+           *
+           * Worth knowing about and not worth breaking this test over: what is under test here is
+           * that the content bridges into the engine deterministically, not that a player who
+           * says "Flinch" to a thing that repeats what you say deserves the fight they get.
+           */
+          const options = legalActions(state);
+          const action =
+            options.find((option) => {
+              if (option.k !== 'play_card') return false;
+              const held = state.deck.hand.find((card) => card.uid === option.uid);
+              return held ? state.library[held.cardId]?.type === 'attack' : false;
+            }) ?? options[0];
           if (!action) break;
           state = reduce(state, action);
         }

@@ -161,11 +161,24 @@ export const STORE_ASSET_IDS: readonly string[] = [
 
 export const BRAND_ASSET_IDS: readonly string[] = ['wordmark'];
 
-/** §4.2. Interest bills you per lap for the deck you insisted on keeping. */
+/**
+ * §4.2. Interest bills you per lap for the deck you insisted on keeping.
+ *
+ * The doc's table starts billing at Load 25 and the demo's decks never get there. Measured over
+ * 10,000 runs: a fight is entered at Load 15.0 on average, the ten-card starter is Load 12, and a
+ * player who drafts at every opportunity finishes Act 1 around 16. Interest fired in 5.6% of
+ * fights, all but a handful of them the boss, which makes the second pillar of the design a thing
+ * the demo describes rather than a thing it does.
+ *
+ * Shifted down a band, keeping the widths: the starter deck is free, and the cards you added on
+ * top of it are what you are billed for. The period stays at a lap, which §4.2 fixes and the
+ * Interest Table Mark reads against, so Interest still only bites in the fights that run long.
+ * That part was always the design and is not a bug.
+ */
 export const INTEREST_TABLE: readonly { readonly maxLoad: number; readonly compounds: number }[] = [
-  { maxLoad: 24, compounds: 0 },
-  { maxLoad: 39, compounds: 1 },
-  { maxLoad: 54, compounds: 2 },
+  { maxLoad: 14, compounds: 0 },
+  { maxLoad: 29, compounds: 1 },
+  { maxLoad: 44, compounds: 2 },
   { maxLoad: Number.POSITIVE_INFINITY, compounds: 3 },
 ];
 
