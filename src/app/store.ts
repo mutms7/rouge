@@ -54,6 +54,8 @@ export type AppStore = {
   readonly hoveredTarget: string | null;
   readonly targeting: Targeting | null;
   readonly helpOpen: boolean;
+  readonly settingsOpen: boolean;
+  readonly creditsOpen: boolean;
 
   /** Index into `choices`, outside a fight. */
   readonly choice: number;
@@ -77,6 +79,8 @@ export type AppStore = {
   moveTarget: (by: number) => void;
   cancel: () => void;
   toggleHelp: () => void;
+  toggleSettings: () => void;
+  toggleCredits: () => void;
 
   moveChoice: (by: number) => void;
   setChoice: (index: number) => void;
@@ -102,6 +106,8 @@ const FRESH = {
   hoveredTarget: null,
   targeting: null,
   helpOpen: false,
+  settingsOpen: false,
+  creditsOpen: false,
   choice: 0,
   confirm: null,
   sheetOpen: false,
@@ -229,7 +235,15 @@ export const useApp = create<AppStore>()((set, get) => ({
   },
 
   cancel: () => {
-    const { targeting, helpOpen, sheetOpen, confirm } = get();
+    const { targeting, helpOpen, sheetOpen, settingsOpen, creditsOpen, confirm } = get();
+    if (settingsOpen) {
+      set({ settingsOpen: false });
+      return;
+    }
+    if (creditsOpen) {
+      set({ creditsOpen: false });
+      return;
+    }
     if (helpOpen) {
       set({ helpOpen: false });
       return;
@@ -246,7 +260,15 @@ export const useApp = create<AppStore>()((set, get) => ({
   },
 
   toggleHelp: () => {
-    set({ helpOpen: !get().helpOpen, sheetOpen: false });
+    set({ helpOpen: !get().helpOpen, sheetOpen: false, settingsOpen: false, creditsOpen: false });
+  },
+
+  toggleSettings: () => {
+    set({ settingsOpen: !get().settingsOpen, helpOpen: false, sheetOpen: false, creditsOpen: false });
+  },
+
+  toggleCredits: () => {
+    set({ creditsOpen: !get().creditsOpen, helpOpen: false, sheetOpen: false, settingsOpen: false });
   },
 
   moveChoice: (by) => {
@@ -287,7 +309,7 @@ export const useApp = create<AppStore>()((set, get) => ({
   },
 
   toggleSheet: () => {
-    set({ sheetOpen: !get().sheetOpen, helpOpen: false });
+    set({ sheetOpen: !get().sheetOpen, helpOpen: false, settingsOpen: false, creditsOpen: false });
   },
 
   onward: () => {

@@ -7,6 +7,7 @@
  * drawn rather than implied, because "three of eight" is the whole tension of Settling: it is
  * a bidding war over a small board, and you cannot bid against a board you cannot see.
  */
+import { useRef } from 'react';
 import { markOf } from '../../content/marks';
 import { tokenOf } from '../../content/tokens';
 import { deckLoadOf, deckView, markSlotsOf } from '../../engine/run';
@@ -16,16 +17,19 @@ import { CARDS } from '../../content/cards';
 import { baseIdOf } from '../../engine/variants';
 import { Art } from '../art/Art';
 import { strings } from '../strings';
+import { useFocusTrap } from '../useFocusTrap';
 import { cardName, cardTextOf } from './choices';
 
 export function Sheet({ run, onClose }: { readonly run: RunState; readonly onClose: () => void }) {
   const slots = markSlotsOf(run);
   const load = deckLoadOf(run);
   const cards = deckView(run);
+  const panel = useRef<HTMLDivElement>(null);
+  useFocusTrap(panel, true);
 
   return (
     <div className="sheet" role="dialog" aria-modal="true" aria-label={strings.run.sheet}>
-      <div className="sheet__panel sheet__panel--wide">
+      <div className="sheet__panel sheet__panel--wide" ref={panel}>
         <h2 className="sheet__title">{strings.run.sheet}</h2>
 
         <section className="roster">

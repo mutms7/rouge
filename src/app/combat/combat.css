@@ -30,7 +30,18 @@
   overflow: hidden;
 }
 
+/*
+ * Explicit rows, not document order.
+ *
+ * `NotaryCallout` renders nothing outside a Notary fight, which used to shift every sibling
+ * after it up one implicit track: the hand ended up in the `minmax(0, 1fr)` row meant for the
+ * scrolling record, and at 1280x720 that track had nothing left to give it, so `overflow:
+ * hidden` quietly clipped the hand off the bottom of the screen. Pinning every child to a
+ * named line (set alongside each one's own rule below) makes the grid correct whether or not
+ * the optional row is there to fill.
+ */
 .combat__bar {
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: calc(var(--space) * 2);
@@ -53,6 +64,7 @@
 }
 
 .combat__notary {
+  grid-row: 2;
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
@@ -99,6 +111,7 @@
 /* --- bodies --------------------------------------------------------------- */
 
 .bodies {
+  grid-row: 3;
   display: flex;
   justify-content: center;
   align-items: flex-end;
@@ -278,6 +291,7 @@
 /* --- the tally ------------------------------------------------------------ */
 
 .tally {
+  grid-row: 4;
   border-top: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
   padding: var(--space) 0;
@@ -570,6 +584,7 @@
 /* --- the middle row ------------------------------------------------------- */
 
 .combat__middle {
+  grid-row: 5;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.4fr) minmax(0, 1fr);
   gap: calc(var(--space) * 2);
@@ -803,6 +818,7 @@
 /* --- hand ----------------------------------------------------------------- */
 
 .hand {
+  grid-row: 6;
   position: relative;
   z-index: 0;
   display: flex;

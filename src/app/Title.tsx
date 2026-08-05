@@ -1,10 +1,9 @@
 /**
- * The way in. A seed, a button, and a run to resume if there is one.
+ * The main menu. A seed, a button, a run to resume if there is one, and the doors to
+ * settings and credits.
  *
  * The seed is on screen and editable for the reason it is on screen everywhere else: a bug
- * report in this game is a seed. Phase 7 puts a proper main menu and a settings screen around
- * this; what has to be here now is the resume path, because save and resume is phase 4's exit
- * criterion and a resume nobody can reach is not resume.
+ * report in this game is a seed.
  */
 import { strings } from './strings';
 
@@ -15,9 +14,11 @@ export type TitleProps = {
   readonly onBegin: () => void;
   readonly onResume: () => void;
   readonly onAbandon: () => void;
+  readonly onSettings: () => void;
+  readonly onCredits: () => void;
 };
 
-export function Title({ seed, hasSave, onSeed, onBegin, onResume, onAbandon }: TitleProps) {
+export function Title({ seed, hasSave, onSeed, onBegin, onResume, onAbandon, onSettings, onCredits }: TitleProps) {
   return (
     <main className="select">
       <header className="select__head">
@@ -67,6 +68,12 @@ export function Title({ seed, hasSave, onSeed, onBegin, onResume, onAbandon }: T
         <div className="sheet__actions">
           <button type="button" className="button" onClick={onBegin} {...(hasSave ? {} : { autoFocus: true })}>
             {strings.select.begin}
+          </button>
+          <button type="button" className="button button--quiet" onClick={onSettings}>
+            {strings.select.settings}
+          </button>
+          <button type="button" className="button button--quiet" onClick={onCredits}>
+            {strings.select.credits}
           </button>
         </div>
       </section>

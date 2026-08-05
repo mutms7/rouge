@@ -40,3 +40,29 @@ h3 {
     transition-duration: 0.001ms !important;
   }
 }
+
+/*
+ * Colourblind-safe mode, from the settings screen.
+ *
+ * Nothing in this game is meant to encode information in colour alone: oxblood always sits
+ * next to a word, an icon, or a shape that says the same thing. This mode does not introduce
+ * a colour outside the locked seven-value palette (`tokens.css` fails the build if it ever
+ * does); it turns the volume up on the non-colour cue that was already there, for the handful
+ * of debt-coloured readouts that are otherwise carried by colour weight alone.
+ */
+:root[data-colourblind='true'] .runbar__value[data-low],
+:root[data-colourblind='true'] .combat__notaryCanceled,
+:root[data-colourblind='true'] .body__phase,
+:root[data-colourblind='true'] .body__hpAfter,
+:root[data-colourblind='true'] .pick__warn,
+:root[data-colourblind='true'] .tag {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
+:root[data-colourblind='true'] .body[data-doomed],
+:root[data-colourblind='true'] .combat__notary[data-active] {
+  border-width: 3px;
+}

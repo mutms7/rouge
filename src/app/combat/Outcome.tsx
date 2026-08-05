@@ -10,8 +10,10 @@
  * you bought, and the cards you Settled to buy them.
  */
 import { motion } from 'motion/react';
+import { useRef } from 'react';
 import { useDuration } from '../settings';
 import { strings } from '../strings';
+import { useFocusTrap } from '../useFocusTrap';
 import type { CombatState } from '../../engine/types';
 
 export type OutcomeProps = {
@@ -23,6 +25,8 @@ export type OutcomeProps = {
 export function Outcome({ state, onward, label }: OutcomeProps) {
   const duration = useDuration(0.3);
   const won = state.outcome === 'won';
+  const panel = useRef<HTMLDivElement>(null);
+  useFocusTrap(panel, true);
 
   return (
     <motion.div
@@ -34,7 +38,7 @@ export function Outcome({ state, onward, label }: OutcomeProps) {
       aria-modal="true"
       aria-label={won ? strings.outcome.won : strings.outcome.lost}
     >
-      <div className="sheet__panel" data-outcome={state.outcome}>
+      <div className="sheet__panel" data-outcome={state.outcome} ref={panel}>
         <h2 className="sheet__title">{won ? strings.outcome.won : strings.outcome.lost}</h2>
         <p className="sheet__blurb">{won ? strings.outcome.wonBlurb : strings.outcome.lostBlurb}</p>
         <p className="sheet__stats">

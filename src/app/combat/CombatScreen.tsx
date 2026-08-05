@@ -13,14 +13,16 @@
  * animation can do is make the board correct sooner.
  */
 import { useAnimate } from 'motion/react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { encounterOf } from '../../content/enemies';
+import { RUN_CONTENT } from '../../content/library';
 import { effectiveWeight, isPlayerTurn } from '../../engine/combat';
 import { cardWeight } from '../../engine/tally';
 import type { Action, CombatState } from '../../engine/types';
 import { useDuration, useSettings, useSkipAnimation } from '../settings';
 import { useApp } from '../store';
 import { strings } from '../strings';
+import { hasSeenTutorial, markTutorialSeen } from '../tutorial';
 import { EnemyBoard, PlayerPanel } from './Bodies';
 import { faceOf } from './face';
 import { logLines, namingFor } from './feed';
@@ -33,6 +35,7 @@ import { previewAction } from './preview';
 import { actorOf, legalCardActions, needsTarget, playAction, targetableEnemies } from './store';
 import { Tally } from './Tally';
 import { trackView } from './track';
+import { Tutorial } from './Tutorial';
 import { useFlashes } from './useFlashes';
 import { shakeKeyframes, useImpact } from './useImpact';
 
@@ -92,6 +95,16 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
   const helpOpen = useApp((s) => s.helpOpen);
   const hoveredTarget = useApp((s) => s.hoveredTarget);
   const store = useApp.getState;
+
+  // Fight one only, and only until it is dismissed once, ever. Lazy so the localStorage read
+  // happens at most once per mount rather than on every render.
+  const [tutorialOpen, setTutorialOpen] = useState(
+    () => encounterId === RUN_CONTENT.encounters.tutorial && !hasSeenTutorial(),
+  );
+  const dismissTutorial = useCallback(() => {
+    markTutorialSeen();
+    setTutorialOpen(false);
+  }, []);
 
   const flashes = useFlashes();
   const impact = useImpact();
@@ -189,6 +202,17 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
         interactive: live !== null && isPlayerTurn(live),
       });
       if (!intent) return;
+
+      // A dialog on top of the board owns the keyboard. Only the keys that close it, or that
+      // opened it in the first place, answer while one is up; everything else would otherwise
+      // move the hand cursor or the target picker invisibly underneath it.
+      if (tutorialOpen) {
+        if (intent.k === 'cancel') dismissTutorial();
+        return;
+      }
+      if (current.settingsOpen || current.creditsOpen || current.helpOpen) {
+        if (intent.k !== 'toggle_help' && intent.k !== 'cancel') return;
+      }
       event.preventDefault();
 
       switch (intent.k) {
@@ -247,7 +271,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [store, commit, discard]);
+  }, [store, commit, discard, tutorialOpen, dismissTutorial]);
 
   const naming = namingFor(state);
   const view = trackView(state, actorOf(state)?.id ?? null);
@@ -358,6 +382,7 @@ export function CombatScreen({ state, encounterId, onward }: CombatScreenProps) 
         />
       )}
       {helpOpen ? <Help onClose={() => { store().toggleHelp(); }} /> : null}
+      {tutorialOpen ? <Tutorial onClose={dismissTutorial} /> : null}
     </div>
   );
 }

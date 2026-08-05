@@ -200,6 +200,38 @@ describe('the app store', () => {
   });
 });
 
+describe('settings and credits, as overlays', () => {
+  it('close on cancel before anything else underneath them', () => {
+    mount('chalk_debtor', 1);
+    useApp.setState({ settingsOpen: true, sheetOpen: true, helpOpen: true, targeting: { uid: 'x', index: 0 } });
+    useApp.getState().cancel();
+    expect(useApp.getState().settingsOpen).toBe(false);
+    // Everything underneath is still up: one Escape closes one thing.
+    expect(useApp.getState().sheetOpen).toBe(true);
+    expect(useApp.getState().helpOpen).toBe(true);
+    expect(useApp.getState().targeting).not.toBeNull();
+  });
+
+  it('are mutually exclusive with the sheet and the legend', () => {
+    useApp.setState({ sheetOpen: true, helpOpen: false, settingsOpen: false, creditsOpen: false });
+    useApp.getState().toggleSettings();
+    expect(useApp.getState().settingsOpen).toBe(true);
+    expect(useApp.getState().sheetOpen).toBe(false);
+
+    useApp.getState().toggleCredits();
+    expect(useApp.getState().creditsOpen).toBe(true);
+    expect(useApp.getState().settingsOpen).toBe(false);
+
+    useApp.getState().toggleHelp();
+    expect(useApp.getState().helpOpen).toBe(true);
+    expect(useApp.getState().creditsOpen).toBe(false);
+
+    useApp.getState().toggleSheet();
+    expect(useApp.getState().sheetOpen).toBe(true);
+    expect(useApp.getState().helpOpen).toBe(false);
+  });
+});
+
 /**
  * The confirm step, which is the phase brief's one explicit UI requirement above combat:
  * "Settling a card into its Mark with a confirm step, since it's irreversible."

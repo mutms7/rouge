@@ -5,9 +5,11 @@
  * bought, and the cards you Settled to buy them. Settlement history is already in `runLog`,
  * so this screen can explain the final sheet without reconstructing any actions.
  */
+import { useRef } from 'react';
 import { deckLoadOf } from '../../engine/run';
 import type { RunState } from '../../engine/runtypes';
 import { strings } from '../strings';
+import { useFocusTrap } from '../useFocusTrap';
 import { acquiredMarksSummary, endedDeckSummary } from './summary';
 
 export type RunOverProps = {
@@ -20,6 +22,8 @@ export function RunOver({ run, onAgain }: RunOverProps) {
   const deck = endedDeckSummary(run);
   const marks = acquiredMarksSummary(run);
   const titleId = 'run-over-title';
+  const panel = useRef<HTMLDivElement>(null);
+  useFocusTrap(panel, true);
 
   return (
     <div
@@ -28,7 +32,7 @@ export function RunOver({ run, onAgain }: RunOverProps) {
       aria-modal="true"
       aria-labelledby={titleId}
     >
-      <div className="sheet__panel sheet__panel--runover" data-outcome={won ? 'won' : 'lost'}>
+      <div className="sheet__panel sheet__panel--runover" data-outcome={won ? 'won' : 'lost'} ref={panel}>
         <h2 className="sheet__title" id={titleId}>{won ? strings.run.over.won : strings.run.over.lost}</h2>
         <p className="sheet__blurb">{won ? strings.run.overBlurb.won : strings.run.overBlurb.lost}</p>
         <p className="sheet__stats">

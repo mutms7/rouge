@@ -282,7 +282,7 @@ export function PlayerPanel({ state, flashes, guardAfter, hpAfter, guardBroke }:
 
         <div className="player__row">
           <Stat
-            label={frozen ? `${strings.combat.guard} (held)` : strings.combat.guard}
+            label={frozen ? strings.combat.guardHeld : strings.combat.guard}
             value={player.guard}
             {...(guardAfter !== null ? { after: guardAfter } : {})}
           />

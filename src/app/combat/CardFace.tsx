@@ -78,7 +78,7 @@ export function CardFace({
       <span className="card__top">
         <span className="card__weight" data-discounted={discounted || undefined}>
           <span className="card__weightNum">{weight}</span>
-          <span className="card__weightLabel">{discounted ? `was ${String(printedWeight)}` : strings.combat.weight}</span>
+          <span className="card__weightLabel">{discounted ? strings.combat.was(printedWeight) : strings.combat.weight}</span>
         </span>
         {shortcut ? <span className="card__key">{shortcut}</span> : null}
         <span className="card__type">{face.def.type}</span>

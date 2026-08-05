@@ -25,7 +25,15 @@ import { PromptScreen } from './PromptScreen';
 import { RunOver } from './RunOver';
 import { Sheet } from './Sheet';
 
-function StatusBar({ onSheet, onHelp }: { readonly onSheet: () => void; readonly onHelp: () => void }) {
+function StatusBar({
+  onSheet,
+  onHelp,
+  onSettings,
+}: {
+  readonly onSheet: () => void;
+  readonly onHelp: () => void;
+  readonly onSettings: () => void;
+}) {
   const run = useApp((s) => s.run);
   const fastForwardLocked = useSettings((s) => s.fastForwardLocked);
   const toggleFastForwardLock = useSettings((s) => s.toggleFastForwardLock);
@@ -64,6 +72,9 @@ function StatusBar({ onSheet, onHelp }: { readonly onSheet: () => void; readonly
       <button type="button" className="link" data-on={fastForwardLocked || undefined} onClick={toggleFastForwardLock}>
         {strings.keys.fastForward} ({strings.keys.fastForwardHint})
       </button>
+      <button type="button" className="link" onClick={onSettings}>
+        {strings.select.settings}
+      </button>
       <button type="button" className="link" onClick={onHelp}>
         {strings.keys.help}
       </button>
@@ -92,9 +103,13 @@ export function RunScreen() {
       const current = store();
       const intent = runIntentForKey(event.key, {
         choices: choicesOf(current.run).length,
-        overlay: current.sheetOpen || current.helpOpen,
+        overlay: current.sheetOpen || current.helpOpen || current.settingsOpen || current.creditsOpen,
       });
       if (!intent) return;
+      // Settings and credits close on Escape (`cancel`) or the button that opened them; every
+      // other key, including the ones that would otherwise open the sheet or the legend on
+      // top of them, is a no-op while one is up.
+      if ((current.settingsOpen || current.creditsOpen) && intent.k !== 'cancel') return;
       event.preventDefault();
 
       switch (intent.k) {
@@ -137,6 +152,9 @@ export function RunScreen() {
         }}
         onHelp={() => {
           store().toggleHelp();
+        }}
+        onSettings={() => {
+          store().toggleSettings();
         }}
       />
 
