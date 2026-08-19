@@ -6,6 +6,10 @@ A roguelike deckbuilding dungeon crawler about carrying other people's debts dow
 
 **Web build: [rougerogue.vercel.app](https://rougerogue.vercel.app)**
 
+![Title screen with seed input and the begin descent button](docs/screenshots/01-initial.png)
+
+![The ledger, a node map for the run with placeholder HUD stats](docs/screenshots/02-descent.png)
+
 There's no game in it yet. Phase 0 is done, which means the project skeleton, the art pipeline, and CI. What the link shows you is procedural placeholders proving that art lands by content ID with no code change. Combat arrives in phase 3.
 
 ---
